@@ -26,5 +26,5 @@ MLFlow Tasks extends MLFlow by providing a Task class that:
  result = func_task.get_result() # -> 84
  experiment_id = func_task.experiment_id # -> 27
  run_id = func_task.run_id # -> 081adc5cb135404696d51f2cbd67c2f2
- status = func_task.refresh_status() # -> 'COMPLETED'
+ status = func_task.get_run().info.status # -> 'COMPLETED'
  ```
