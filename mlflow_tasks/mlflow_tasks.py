@@ -245,8 +245,7 @@ class Task:
         # take non-string params, cache them and replace with uris
         for p, val in params.items():
             if isinstance(val, str):
-                # Do nothing
-                continue
+                clean_params[p] = val
             elif isinstance(val, Task):
                 if not val.result is None:
                     # Cache it
@@ -403,12 +402,17 @@ class Task:
             # Filer out folders
             cache_file_list = [os.path.join(params_cache_dir,f) for f in cache_file_list if os.path.isfile(os.path.join(params_cache_dir,f))]
         
-        if len(cache_file_list) == 0:
+        if (len(cache_file_list) == 0):
+            if not os.path.exists(params_cache_dir):
+                os.makedirs(params_cache_dir)
             # no cache files found, download any from the log
-            params_cache_dir = mlflow_client.download_artifacts(self.run.info.run_id, "params", params_cache_dir)
-            cache_file_list = os.listdir(params_cache_dir)
-            # Filter out folders
-            cache_file_list = [os.path.join(params_cache_dir,f) for f in cache_file_list if os.path.isfile(os.path.join(params_cache_dir,f))]
+            try:
+                params_cache_dir = mlflow_client.download_artifacts(self.run.info.run_id, "params", params_cache_dir)
+                cache_file_list = os.listdir(params_cache_dir)
+                # Filter out folders
+                cache_file_list = [os.path.join(params_cache_dir,f) for f in cache_file_list if os.path.isfile(os.path.join(params_cache_dir,f))]
+            except Exception as e:
+                pass
 
         # rehydrate params
         for cache_uri in cache_file_list:
