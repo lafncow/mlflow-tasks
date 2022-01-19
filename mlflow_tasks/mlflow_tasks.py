@@ -397,9 +397,11 @@ class Task:
         
         # List files in the params cache directory
         params_cache_dir = os.path.join(cache_dir, self.experiment_id, self.run_id, "artifacts", "params")
-        cache_file_list = os.listdir(params_cache_dir)
-        # Filer out folders
-        cache_file_list = [os.path.join(params_cache_dir,f) for f in cache_file_list if os.path.isfile(os.path.join(params_cache_dir,f))]
+        cache_file_list = []
+        if os.path.exists(params_cache_dir):
+            cache_file_list = os.listdir(params_cache_dir)
+            # Filer out folders
+            cache_file_list = [os.path.join(params_cache_dir,f) for f in cache_file_list if os.path.isfile(os.path.join(params_cache_dir,f))]
         
         if len(cache_file_list) == 0:
             # no cache files found, download any from the log
