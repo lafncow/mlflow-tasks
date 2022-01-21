@@ -134,8 +134,7 @@ class Task:
     def __exec_func__(self, func, **params):
         # TODO add func to run information
         # Log params
-        if self.write_cache or self.write_log:
-            self.__log_params__(params)
+        self.__log_params__(params)
         
         # Run the task
         result_data = func(**params)
@@ -225,7 +224,7 @@ class Task:
         # TODO change they way model_uri is recorded on the run?
         # Log params
         params = {"model_uri": model_uri, "model_input": model_input}
-        if self.write_cache or self.write_log:
+        if self.write_cache:
             clean_params = self.__log_params__(params)
 
         # Run the task
@@ -288,7 +287,7 @@ class Task:
         self.run = mlflow.get_run(self.run.info.run_id)
         return self.run
     
-    def set_result(self, result, write_log=True, write_cache=True):
+    def set_result(self, result, write_log=False, write_cache=False):
         
         self.result = result
             
