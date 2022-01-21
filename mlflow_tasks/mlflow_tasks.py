@@ -38,18 +38,13 @@ def start_task(**args):
     return Task(**args)
 
 class Task:
-    def __init__(self, action=None, run_id=None, run_name=None, experiment_id=None, experiment_name=None, tags=None, write_cache=True, write_log=True, autolog=True, log_nb_html=True, **params):
+    def __init__(self, action=None, run_id=None, run_name=None, experiment_id=None, experiment_name=None, tags=None, write_log=True, autolog=True, log_nb_html=True, **params):
         self.result = None
         self.run = None
         self.log_uri = None
         self.cache_uri = None
         self.write_log = write_log
-        self.write_cache = write_cache
         self.log_nb_html = log_nb_html
-
-        if "FLOW_CACHE_RESULT" in os.environ:
-            if (os.environ["FLOW_CACHE_RESULT"] == "True") or (os.environ["FLOW_CACHE_RESULT"] == "TRUE"):
-                self.write_cache = True
         
         if "FLOW_LOG_RESULT" in os.environ:
             if (os.environ["FLOW_LOG_RESULT"] == "True") or (os.environ["FLOW_LOG_RESULT"] == "TRUE"):
@@ -156,8 +151,7 @@ class Task:
             "MLFLOW_TRACKING_URI": mlflow.tracking.get_tracking_uri(),
             "MLFLOW_EXPERIMENT_NAME": self.experiment_name,
             "MLFLOW_RUN_ID": str(self.run_id),
-            "FLOW_LOG_RESULT": str(self.write_log),
-            "FLOW_CACHE_RESULT": str(self.write_cache)
+            "FLOW_LOG_RESULT": str(self.write_log)
         })
         
         # Convert parameters into commandline arguments
@@ -191,7 +185,6 @@ class Task:
         os.environ["MLFLOW_EXPERIMENT_NAME"] = self.experiment_name
         os.environ["MLFLOW_RUN_ID"] = str(self.run_id)
         os.environ["FLOW_LOG_RESULT"] = str(self.write_log)
-        os.environ["FLOW_CACHE_RESULT"] = str(self.write_cache)
         
         # Run the notebook
         papermill.execute_notebook(
@@ -224,8 +217,7 @@ class Task:
         # TODO change they way model_uri is recorded on the run?
         # Log params
         params = {"model_uri": model_uri, "model_input": model_input}
-        if self.write_cache:
-            clean_params = self.__log_params__(params)
+        clean_params = self.__log_params__(params)
 
         # Run the task
         model = mlflow.pyfunc.load_model(model_uri)
@@ -287,13 +279,13 @@ class Task:
         self.run = mlflow.get_run(self.run.info.run_id)
         return self.run
     
-    def set_result(self, result, write_log=False, write_cache=False):
+    def set_result(self, result, write_log=False):
         
         self.result = result
             
         if write_log or self.write_log:
             self.log_result(result)
-        elif write_cache or self.write_cache:
+        else:
             self.cache_result(result)
         
         return True
