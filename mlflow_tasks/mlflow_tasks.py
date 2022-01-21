@@ -382,11 +382,12 @@ class Task:
     
     def get_params(self, default_params=None):
         self.get_run()
-        params = self.run.data.params
+        params = self.run.data.params or {}
         
         # Add any given params
         if not default_params is None:
-            params = default_params.update(params)
+            default_params.update(params)
+            params = default_params
         
         # List files in the params cache directory
         params_cache_dir = os.path.join(cache_dir, self.experiment_id, self.run_id, "artifacts", "params")
