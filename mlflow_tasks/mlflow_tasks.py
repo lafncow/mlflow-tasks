@@ -257,7 +257,8 @@ class Task:
                 elif val.get_cache_uri():
                     # Create copy from cache
                     param_link_uri = os.path.join(cache_dir, self.experiment_id, self.run_id, "artifacts", "params", p)
-                    os.makedirs(os.path.split(param_link_uri)[0])
+                    if not os.path.exists(os.path.split(param_link_uri)[0]):
+                        os.makedirs(os.path.split(param_link_uri)[0])
                     shutil.copyfile(val.cache_uri, param_link_uri)
                     clean_params[p] = param_link_uri
                 elif not val.get_result() is None:
@@ -360,7 +361,8 @@ class Task:
         # TODO change result logging method based on type
         
         result_dir = os.path.join(cache_dir, self.run.info.experiment_id, self.run.info.run_id, "result")
-        os.makedirs(result_dir)
+        if not os.path.exists(result_dir):
+            os.makedirs(result_dir)
         cache_uri = os.path.join(result_dir, "result.pkl")
         cache_file = open(cache_uri,'wb')
         pickle.dump(self.result, cache_file)
@@ -379,7 +381,8 @@ class Task:
         artifact_cache_dir = os.path.join(cache_dir, self.run.info.experiment_id, self.run.info.run_id, "artifacts")
         #os.makedirs(artifact_cache_dir)
         cache_uri = os.path.join(artifact_cache_dir, artifact_path)
-        os.makedirs(os.path.split(cache_uri)[0])
+        if not os.path.exists(os.path.split(cache_uri)[0]):
+            os.makedirs(os.path.split(cache_uri)[0])
         cache_file = open(cache_uri,'wb')
         pickle.dump(val, cache_file)
         cache_file.close()
