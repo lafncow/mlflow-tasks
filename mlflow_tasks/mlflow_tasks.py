@@ -418,31 +418,6 @@ class Task:
             cache_file.close()
         
         return params
-    
-    def get_cache_uri(self, artifact_path=None):
-        if self.cache_uri:
-            return self.cache_uri
-        
-        cache_uri = None
-        # List files in the result cache directory
-        task_cache_dir = os.path.join(cache_dir, self.experiment_id, self.run_id, "result")
-        try:
-            file_list = os.listdir(task_cache_dir)
-        except:
-            return None
-        file_list = [os.path.join(task_cache_dir,f) for f in file_list if os.path.isfile(os.path.join(task_cache_dir,f))]
-
-        if len(file_list) == 1:
-            cache_uri = file_list[0]
-        elif len(file_list) > 1:
-            cache_uri = file_list[0]
-            print(f"Found multiple result files found in cache! Taking the first one: {cache_uri}")
-        else:
-            print("No result files found in cache")
-            
-        self.cache_uri = cache_uri
-
-        return cache_uri
 
     def get_cache_uri(self, artifact_path=None):
         if self.cache_uri:
