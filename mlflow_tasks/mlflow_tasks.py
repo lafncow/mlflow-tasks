@@ -13,7 +13,7 @@ from mlflow.entities import RunStatus
 
 mlflow_client = MlflowClient()
 # TODO make this adjustable, maybe with env variable?
-cache_dir = os.path.join(os.path.split(os.path.abspath(''))[0], "tmp", "results_cache")
+cache_dir = os.path.join(os.path.abspath(''), "mlflow_tasks_cache")
 
 def get_or_create_experiment(experiment_name):
     experiment = mlflow.get_experiment_by_name(experiment_name)
