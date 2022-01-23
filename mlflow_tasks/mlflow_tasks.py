@@ -185,11 +185,15 @@ class Task:
         os.environ["MLFLOW_EXPERIMENT_NAME"] = self.experiment_name
         os.environ["MLFLOW_RUN_ID"] = str(self.run_id)
         os.environ["FLOW_LOG_RESULT"] = str(self.write_log)
+
+        nb_name = os.path.splitext(os.path.split(nb_path)[1])[0]
+        nb_result_name = nb_name+"_result.ipynb"
+        nb_result_path = os.path.join(cache_dir, self.experiment_id, self.run_id, "artifacts", nb_result_name)
         
         # Run the notebook
         papermill.execute_notebook(
            nb_path,
-           nb_path,
+           nb_result_path,
            parameters = clean_params
         )
         
@@ -198,11 +202,11 @@ class Task:
         
         if self.log_nb_html:
             """Export the notebook to HTML and return the path"""
-            html_path = nb_path.split(".")[0] + ".html"
+            html_path = nb_result_path.split(".")[0] + ".html"
             # Create HTML exporter
             html_exporter = HTMLExporter()
             html_exporter.template_name = 'classic'
-            (html_text, resources) = html_exporter.from_filename(nb_path)
+            (html_text, resources) = html_exporter.from_filename(nb_result_path)
             html_file = open(html_path,'wb')
             html_file.write(html_text.encode("utf-8"))
             html_file.close()
