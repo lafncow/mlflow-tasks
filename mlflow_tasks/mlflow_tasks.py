@@ -321,10 +321,10 @@ class Task:
             self.log_uri = self.get_log_uri()
         
         if not self.log_uri is None:
-            download_dir = os.path.join(cache_dir, task_experiment.experiment_id, task_run.info.run_id, "result")
+            download_dir = os.path.join(cache_dir, self.experiment_id, self.run_id, "result")
             # Download data from uri
-            self.cache_uri = mlflow_client.download_artifacts(self.log_uri, "result", download_dir)
-        
+            download_dir = mlflow_client.download_artifacts(self.run_id, "result", download_dir)
+            self.cache_uri = os.path.join(download_dir, "result.pkl")
             # Unpack the data into a variable
             cache_file = open(self.cache_uri, 'rb')
             self.result = pickle.load(cache_file)
