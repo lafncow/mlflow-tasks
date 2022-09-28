@@ -72,6 +72,19 @@ def test_task_get_result_from_cache():
     res = task.get_result()
     assert res == 8
 
+def test_task_get_result_from_log():
+    task = mlflow_tasks.Task(experiment_name="Task Test Experiment", write_log=True)
+    task.set_result(8)
+    task.end_run()
+    # Clear result
+    task.result = None
+    # Clear cache
+    cache_uri = task.get_cache_uri()
+    task.cache_uri = None
+    os.remove(cache_uri)
+    res = task.get_result()
+    assert res == 8
+    
 def test_task_get_params():
     task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="Task Test Experiment")
     params = task.get_params()
