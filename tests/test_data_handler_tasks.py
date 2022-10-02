@@ -19,9 +19,16 @@ test_tracking_folder = os.path.join(project_folder, "test_mlruns")
 # Clear the testing tracking folder
 import shutil
 try:
-    shutil.rmtree(test_tracking_folder)
+    #shutil.rmtree(test_tracking_folder)
+    os.mkdir(test_tracking_folder)
 except:
     pass
+# Make sure testing tracking folder exists
+try:
+    os.mkdir(test_tracking_folder)
+except:
+    pass
+test_tracking_folder = os.path.join(project_folder, "test_mlruns")
 
 # Set the mlflow tracking folder
 mlflow.set_tracking_uri(f"file:/{test_tracking_folder}")
@@ -42,6 +49,7 @@ def test_task_param_to_func_get_params():
     t = mlflow_tasks.Task()
 
     t.set_result([1,2,3])
+    t.end_run()
 
     def x(foo):
         print(foo)
@@ -54,9 +62,11 @@ def test_task_local_cache_get_result():
 
     t.set_result([1,2,3])
     run_id = t.run_id
+    t.end_run()
     del t
 
     t2 = mlflow_tasks.Task(run_id = run_id)
+    t2.end_run()
     assert [1,2,3] == t2.get_result()
 
 def test_task_global_cache_get_result():
@@ -64,10 +74,11 @@ def test_task_global_cache_get_result():
 
     t.set_result([1,2,3])
     run_id = t.run_id
+    t.end_run()
     del t
 
     t2 = mlflow_tasks.Task(run_id = run_id)
-    
+    t2.end_run()
     assert [1,2,3] == t2.get_result()
     
 def test_task_log_get_result():
@@ -75,10 +86,11 @@ def test_task_log_get_result():
 
     t.set_result([1,2,3])
     run_id = t.run_id
+    t.end_run()
     del t
 
     t2 = mlflow_tasks.Task(run_id = run_id)
-    
+    t2.end_run()
     assert [1,2,3] == t2.get_result()
 
 def test_pass_cached_reloaded_task():
@@ -86,11 +98,13 @@ def test_pass_cached_reloaded_task():
 
     t.set_result([1,2,3])
     run_id = t.run_id
+    t.end_run()
     del t
 
     t = mlflow_tasks.Task(run_id = run_id)
+    t.end_run()
     def x(foo):
         return foo
     t2 = mlflow_tasks.Task(x, foo=t)
-    
+    t2.end_run()
     assert [1,2,3] == t2.get_result()

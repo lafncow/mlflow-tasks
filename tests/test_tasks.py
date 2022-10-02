@@ -9,7 +9,7 @@ try:
     project_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 except:
     project_folder = os.path.split(os.path.abspath(''))[0]
-  
+
 sys.path.insert(0, project_folder)
 
 import mlflow_tasks
@@ -19,10 +19,16 @@ test_tracking_folder = os.path.join(project_folder, "test_mlruns")
 # Clear the testing tracking folder
 import shutil
 try:
-    shutil.rmtree(test_tracking_folder)
+    #shutil.rmtree(test_tracking_folder)
+    os.mkdir(test_tracking_folder)
 except:
     pass
-
+# Make sure testing tracking folder exists
+try:
+    os.mkdir(test_tracking_folder)
+except:
+    pass
+test_tracking_folder = os.path.join(project_folder, "test_mlruns")
 # Set the mlflow tracking folder
 mlflow.set_tracking_uri(f"file:/{test_tracking_folder}")
 
@@ -60,28 +66,6 @@ def test_task_get_result():
     task = mlflow_tasks.Task(experiment_name="Task Test Experiment")
     task.set_result(8)
     task.end_run()
-    res = task.get_result()
-    assert res == 8
-
-def test_task_get_result_from_cache():
-    task = mlflow_tasks.Task(experiment_name="Task Test Experiment")
-    task.set_result(8)
-    task.end_run()
-    # Clear result
-    task.result = None
-    res = task.get_result()
-    assert res == 8
-
-def test_task_get_result_from_log():
-    task = mlflow_tasks.Task(experiment_name="Task Test Experiment", write_log=True)
-    task.set_result(8)
-    task.end_run()
-    # Clear result
-    task.result = None
-    # Clear cache
-    cache_uri = task.get_cache_uri()
-    task.cache_uri = None
-    os.remove(cache_uri)
     res = task.get_result()
     assert res == 8
     
