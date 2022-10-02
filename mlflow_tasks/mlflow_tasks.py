@@ -26,13 +26,13 @@ def data_handler_from_path(full_path):
     import yaml
     metadata_uri = full_path + "_meta.yaml"
     run_id = metadata_uri.split("/")[1]
+    experiment_id = metadata_uri.split("/")[0]
     metadata_path = "/".join(metadata_uri.split("/")[2:])
     # Download metadata from log
-    local_metadata_uri = mlflow_client.download_artifacts(run_id, metadata_path)
-    # Check
-    if local_metadata_uri is None:
-        print(f"No metadata found at {metadata_path}")
-        return None
+    try:
+        local_metadata_uri = mlflow_client.download_artifacts(run_id, metadata_path)
+    except:
+        raise Exception(f"No metadata found at {metadata_path}. Could not get data handler for {full_path}.")
     # Read the metadata
     with open(local_metadata_uri, 'r') as metadata_file:
         metadata = yaml.safe_load(metadata_file)
@@ -83,11 +83,6 @@ class Task:
         self.log_nb_html = log_nb_html
         self.params = params
         
-        if data_handler is None:
-            self.data_handler = active_data_handlers['default']()
-        else:
-            self.data_handler = data_handler
-        
         if "FLOW_LOG_RESULT" in os.environ:
             if (os.environ["FLOW_LOG_RESULT"] == "True") or (os.environ["FLOW_LOG_RESULT"] == "TRUE"):
                 self.write_log = True
@@ -128,6 +123,11 @@ class Task:
         self.run_id = self.run.info.run_id
         self.experiment_id = self.run.info.experiment_id
         self.experiment_name = mlflow.get_experiment(self.run.info.experiment_id).name
+        
+        if data_handler is None:
+            self.data_handler = active_data_handlers['default'](self.experiment_id, self.run_id, "result")
+        else:
+            self.data_handler = data_handler
         
         self.print_status()
         
