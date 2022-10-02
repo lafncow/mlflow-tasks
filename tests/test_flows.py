@@ -22,7 +22,7 @@ mlflow.set_tracking_uri(f"file:/{test_tracking_folder}")
 
 
 # +
-# Test Utility Functions
+# Test Flow Methods
 def test_create_flow():
     flow = mlflow_tasks.Flow(experiment_name="Flow Test Experiment")
     flow.end_flow()
@@ -34,7 +34,13 @@ def test_create_flow_named():
     assert flow.experiment_name == "Flow Test Experiment"
 
 def test_create_end_flow():
-    
     flow = mlflow_tasks.Flow(experiment_name="Flow Test Experiment")
     flow.end_flow()
     assert flow.get_run().info.status == "FINISHED"
+
+def test_create_subtask():
+    flow = mlflow_tasks.Flow(experiment_name="Flow Test Experiment")
+    subtask = flow.start_task(experiment_name="SubTask Test Experiment")
+    assert isinstance(subtask, mlflow_tasks.Task)
+    subtask.end_run()
+    flow.end_flow()
