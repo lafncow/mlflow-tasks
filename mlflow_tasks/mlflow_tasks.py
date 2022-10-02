@@ -16,14 +16,12 @@ active_data_handlers = {
     "py_obj": data_handlers.Py_Obj_Handler
 }
 
-
-
-mlflow_client = MlflowClient()
 # TODO make this adjustable, maybe with env variable?
 cache_dir = os.path.join(os.path.abspath(''), "mlflow_tasks_cache")
 
 def data_handler_from_path(full_path):
     import yaml
+    mlflow_client = MlflowClient()
     metadata_uri = full_path + "_meta.yaml"
     run_id = metadata_uri.split("/")[1]
     experiment_id = metadata_uri.split("/")[0]

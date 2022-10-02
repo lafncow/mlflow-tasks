@@ -3,7 +3,6 @@ import pickle
 import yaml
 import mlflow
 from mlflow.tracking import MlflowClient
-mlflow_client = MlflowClient()
 
 class Py_Obj_Handler:
     def __init__(self, cache_dir=None, experiment_id=None, run_id=None, path=None):
@@ -22,6 +21,8 @@ class Py_Obj_Handler:
         if cache_dir is None:
             cache_dir = os.path.join(os.path.abspath(''), "mlflow_tasks_cache")
         self.cache_dir = cache_dir
+        
+        self.mlflow_client = MlflowClient()
 
     def load(self, full_path):
         if full_path is None:
@@ -50,7 +51,7 @@ class Py_Obj_Handler:
             
             log_path = full_path.split("/")[2:]
             # Download from log
-            mlflow_client.download_artifact(self.run_id, log_path, local_cache_uri)
+            self.mlflow_client.download_artifact(self.run_id, log_path, local_cache_uri)
             cache_file = open(local_cache_uri, 'rb')
             dataset = pickle.load(cache_file)
             self.__data__ = dataset
@@ -95,7 +96,7 @@ class Py_Obj_Handler:
         metadata_path = os.path.join(*metadata_path)
         with open(metadata_file_name, 'w') as metadata_file:
             yaml.dump(metadata, metadata_file)
-        mlflow_client.log_artifact(self.run_id, metadata_file_name)
+        self.mlflow_client.log_artifact(self.run_id, metadata_file_name)
         
         # Set cache uri
         self.local_cache_uri = local_cache_uri
@@ -108,7 +109,7 @@ class Py_Obj_Handler:
             self.cache_local()
              
         log_uri = "/".join(self.full_path.split("/")[2:])
-        mlflow_client.log_artifact(self.run_id, self.local_cache_uri, log_uri)
+        self.mlflow_client.log_artifact(self.run_id, self.local_cache_uri, log_uri)
         
         self.log_uri = log_uri
 
