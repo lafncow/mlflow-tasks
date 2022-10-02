@@ -3,17 +3,50 @@ import os
 import subprocess
 from mlflow.tracking import MlflowClient
 import mlflow.pyfunc
-import pickle
 import nbformat
 from nbconvert import HTMLExporter
 import papermill
 import shutil
 from typing import Callable
 from mlflow.entities import RunStatus
+from . import data_handlers
+
+active_data_handlers = {
+    "default": data_handlers.Py_Obj_Handler,
+    "py_obj": data_handlers.Py_Obj_Handler
+}
+
+
 
 mlflow_client = MlflowClient()
 # TODO make this adjustable, maybe with env variable?
 cache_dir = os.path.join(os.path.abspath(''), "mlflow_tasks_cache")
+
+def data_handler_from_path(full_path):
+    import yaml
+    metadata_uri = full_path + "_meta.yaml"
+    run_id = metadata_uri.split("/")[1]
+    experiment_id = metadata_uri.split("/")[0]
+    metadata_path = "/".join(metadata_uri.split("/")[2:])
+    # Download metadata from log
+    try:
+        local_metadata_uri = mlflow_client.download_artifacts(run_id, metadata_path)
+    except:
+        raise Exception(f"No metadata found at {metadata_path}. Could not get data handler for {full_path}.")
+    # Read the metadata
+    with open(local_metadata_uri, 'r') as metadata_file:
+        metadata = yaml.safe_load(metadata_file)
+    # Find the right data handler
+    data_handler_name = metadata['data_handler']
+    if not data_handler_name in data_handlers.__dict__:
+        raise Exception(f"Data handler {data_handler_name} not found.")
+        return None
+    # Create data handler
+    data_handler = data_handlers.__dict__[data_handler_name](**metadata['handler_args'])
+    # Load the data
+    data_handler.load(metadata['full_path'])
+    
+    return data_handler
 
 def get_or_create_experiment(experiment_name):
     experiment = mlflow.get_experiment_by_name(experiment_name)
@@ -37,14 +70,18 @@ def get_task(run_id):
 def start_task(**args):
     return Task(**args)
 
+def register_data_handler(handler_name, handler):
+    active_data_handlers[handler_name] = handler
+
 class Task:
-    def __init__(self, action=None, run_id=None, run_name=None, experiment_id=None, experiment_name=None, tags=None, write_log=True, autolog=True, log_nb_html=True, **params):
+    def __init__(self, action=None, run_id=None, experiment_id=None, experiment_name=None, write_log=False, write_local_cache=False, write_global_cache=False, autolog=True, log_nb_html=True, data_handler=None, **params):
         self.result = None
         self.run = None
-        self.log_uri = None
-        self.cache_uri = None
         self.write_log = write_log
+        self.write_local_cache = write_local_cache
+        self.write_global_cache = write_global_cache
         self.log_nb_html = log_nb_html
+        self.params = params
         
         if "FLOW_LOG_RESULT" in os.environ:
             if (os.environ["FLOW_LOG_RESULT"] == "True") or (os.environ["FLOW_LOG_RESULT"] == "TRUE"):
@@ -81,13 +118,16 @@ class Task:
             self.experiment_id = None
         
         ## Start MLFlow Run
-        self.run = mlflow.start_run(run_id=run_id, experiment_id=self.experiment_id, run_name=run_name, nested=True, tags=tags)
+        self.run = mlflow.start_run(run_id=run_id, experiment_id=self.experiment_id, nested=True)
         
         self.run_id = self.run.info.run_id
         self.experiment_id = self.run.info.experiment_id
-        if "mlflow.runName" in self.run.data.tags:
-            self.run_name = self.run.data.tags["mlflow.runName"]
         self.experiment_name = mlflow.get_experiment(self.run.info.experiment_id).name
+        
+        if data_handler is None:
+            self.data_handler = active_data_handlers['default'](self.experiment_id, self.run_id, "result")
+        else:
+            self.data_handler = data_handler
         
         self.print_status()
         
@@ -99,15 +139,15 @@ class Task:
             end_status = "FAILED"
             # It is a function
             if isinstance(action, Callable):
-                end_status = self.__exec_func__(action, **params)
+                end_status = self.__exec_func__(action)
             # It is a string
             elif isinstance(action, str):
                 # ends in .py
                 if action[-3:] == ".py":
-                    end_status = self.__exec_script__(action, **params)
+                    end_status = self.__exec_script__(action)
                 # ends in .ipynb
                 elif action[-6:] == ".ipynb":
-                    end_status = self.__exec_nb__(action, **params)
+                    end_status = self.__exec_nb__(action)
                 elif "model_input" in params:
                 # is model uri
                 # TODO validate model uri
@@ -126,13 +166,21 @@ class Task:
     def __exit__(self, type, value, traceback):
         self.end_run()
 
-    def __exec_func__(self, func, **params):
+    def __exec_func__(self, func):
         # TODO add func to run information
         # Log params
-        self.__log_params__(params)
+        self.__log_params__()
+        
+        # Unpack Task params
+        unpacked_params = {}
+        for p, val in self.params.items():
+            if isinstance(val, Task):
+                unpacked_params[p] = val.get_result()
+            else:
+                unpacked_params[p] = val
         
         # Run the task
-        result_data = func(**params)
+        result_data = func(**unpacked_params)
         
         # Save result
         self.set_result(result_data)
@@ -140,10 +188,10 @@ class Task:
         # End the run
         return "FINISHED"
 
-    def __exec_script__(self, script_path, **params):
+    def __exec_script__(self, script_path):
         # Log params
         # TODO add script_path to run information
-        clean_params = self.__log_params__(params)
+        clean_params = self.__log_params__(cache_local=True)
         
         # Set MLFlow environment variables
         new_env = os.environ.copy()
@@ -174,10 +222,10 @@ class Task:
             # End the run
             return "FINISHED"
         
-    def __exec_nb__(self, nb_path, **params):
+    def __exec_nb__(self, nb_path):
         # TODO add nb_path to run information
         # Log params
-        clean_params = self.__log_params__(params)
+        clean_params = self.__log_params__(cache_local=True)
         
         # Set MLFlow environment variables
         env_old = os.environ.copy()
@@ -220,8 +268,8 @@ class Task:
     def __exec_model__(self, model_uri, model_input):
         # TODO change they way model_uri is recorded on the run?
         # Log params
-        params = {"model_uri": model_uri, "model_input": model_input}
-        clean_params = self.__log_params__(params)
+        self.params = {"model_uri": model_uri, "model_input": model_input}
+        clean_params = self.__log_params__()
 
         # Run the task
         model = mlflow.pyfunc.load_model(model_uri)
@@ -233,107 +281,68 @@ class Task:
         # End the run
         return "FINISHED"
 
-    def __log_params__(self, params):
+    def __log_params__(self, cache_local=False, cache_global=False, write_log=False):
 
-        clean_params = {}
+        params_as_strs = {}
 
         # take non-string params, cache them and replace with uris
-        for p, val in params.items():
+        for p, val in self.params.items():
             if isinstance(val, str):
-                clean_params[p] = val
+                params_as_strs[p] = val
+
             elif isinstance(val, Task):
-                if not val.result is None:
-                    # Cache it
-                    p_path = os.path.join("params", p)
-                    uri = self.cache_artifact(val.result, p_path)
-                    if self.write_log:
-                        uri = mlflow.log_artifact(uri, p_path)
-                    clean_params[p] = uri
-                elif val.get_cache_uri():
-                    # Create copy from cache
-                    param_link_uri = os.path.join(cache_dir, self.experiment_id, self.run_id, "artifacts", "params", p)
-                    if not os.path.exists(os.path.split(param_link_uri)[0]):
-                        os.makedirs(os.path.split(param_link_uri)[0])
-                    shutil.copyfile(val.cache_uri, param_link_uri)
-                    clean_params[p] = param_link_uri
-                elif not val.get_result() is None:
-                    # Pull from log
-                    p_path = os.path.join("params", p)
-                    uri = self.cache_artifact(val.result, p_path)
-                    if self.write_log:
-                        uri = mlflow.log_artifact(uri, p_path)
-                    clean_params[p] = uri
-                else:
-                    # Give up
-                    print(f"No result value found on task passed as parameter! (Task {val.experiment_id} / {val.run_id})")
-                    clean_params[p] = None
-                    
+                p_handler = val.data_handler
+                if cache_local:
+                    p_handler.cache_local()
+                if cache_global:
+                    p_handler.cache_global()
+                if write_log:
+                    p_handler.log()
+                params_as_strs[p] = p_handler.full_path
+                
             else:
-                p_path = os.path.join("params", p)
-                uri = self.cache_artifact(val, p_path)
-                if self.write_log:
-                    uri = mlflow.log_artifact(uri, p_path)
-                clean_params[p] = uri
+                sub_path = "/".join(["params", p])
+                p_handler = active_data_handlers['default']()
+                p_handler.set(val, self.experiment_id, self.run_id, sub_path)
+                
+                if cache_local:
+                    p_handler.cache_local()
+                if cache_global:
+                    p_handler.cache_global()
+                if write_log:
+                    p_handler.log()
+                params_as_strs[p] = p_handler.full_path
 
-        mlflow.log_params(clean_params)
+        mlflow.log_params(params_as_strs)
 
-        return clean_params
+        return params_as_strs
 
     def get_run(self):
         self.run = mlflow.get_run(self.run.info.run_id)
         return self.run
     
-    def set_result(self, result, write_log=False):
+    def set_result(self, result):
         
         self.result = result
+        self.data_handler.set(result, self.experiment_id, self.run_id, "result")
             
-        if write_log or self.write_log:
-            self.log_result(result)
-        else:
-            self.cache_result(result)
+        if self.write_local_cache:
+            self.data_handler.cache_local()
+        if self.write_global_cache:
+            self.data_handler.cache_global()
+        if self.write_log:
+            self.data_handler.log()
         
-        return True
+        return self.data_handler
     
     def get_result(self):
-        # Check run status and warn/fail if not complete
-        if self.get_run().info.status != "FINISHED":
-            print(f"Can't get results, the run is in status {self.run.info.status}")
-            return None
-        
-        # Return it if we already have it
-        if not self.result is None:
-            return self.result
-        
-        # Return it if it is cached
-        if self.cache_uri is None:
-            self.cache_uri = self.get_cache_uri()
-        
-        if not self.cache_uri is None:
-            # Unpack the data into a variable
-            cache_file = open(self.cache_uri, 'rb')
-            self.result = pickle.load(cache_file)
-            cache_file.close()
-            
-            return self.result
-        
-        # Return it if it is logged
-        if self.log_uri is None:
-            self.log_uri = self.get_log_uri()
-        
-        if not self.log_uri is None:
-            download_dir = os.path.join(cache_dir, self.experiment_id, self.run_id, "result")
-            # Download data from uri
-            download_dir = mlflow_client.download_artifacts(self.run_id, "result", download_dir)
-            self.cache_uri = os.path.join(download_dir, "result.pkl")
-            # Unpack the data into a variable
-            cache_file = open(self.cache_uri, 'rb')
-            self.result = pickle.load(cache_file)
-            cache_file.close()
-            
-            return self.result
-        
-        # Data not found!
-        return None
+        if self.data_handler is None:
+            self.data_handler = data_handler_from_path("/".join([self.experiment_id, self.run_id, "result"]))
+        result = self.data_handler.get()
+        if result is None:
+            self.data_handler = data_handler_from_path("/".join([self.experiment_id, self.run_id, "result"]))
+            result = self.data_handler.get()
+        return result
     
     def log_result(self, result):
         self.result = result
@@ -342,7 +351,7 @@ class Task:
         cache_uri = self.cache_result(result)
 
         # Log result to MLFlow
-        mlflow.log_artifact(cache_uri, "result")
+        mlflow.log_artifact(cache_uri)
         
         log_uri = self.get_log_uri()
         self.log_uri = log_uri
@@ -352,97 +361,66 @@ class Task:
     def cache_result(self, result):
         self.result = result
         
-        # TODO detect result type
-        # TODO change result logging method based on type
-        
         result_dir = os.path.join(cache_dir, self.run.info.experiment_id, self.run.info.run_id, "result")
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
-        cache_uri = os.path.join(result_dir, "result.pkl")
-        cache_file = open(cache_uri,'wb')
-        pickle.dump(self.result, cache_file)
-        cache_file.close()
-        
+        cache_uri = self.data_handler.cache(result, result_dir)
+
         self.cache_uri = cache_uri
         
         return cache_uri
     
-    def cache_artifact(self, val, artifact_path):
+    def cache_artifact(self, val, artifact_path, data_handler="default"):
         
         # TODO make internal method
-        # TODO detect result type
-        # TODO change result logging method based on type
         
         artifact_cache_dir = os.path.join(cache_dir, self.run.info.experiment_id, self.run.info.run_id, "artifacts")
-        #os.makedirs(artifact_cache_dir)
-        cache_uri = os.path.join(artifact_cache_dir, artifact_path)
-        if not os.path.exists(os.path.split(cache_uri)[0]):
-            os.makedirs(os.path.split(cache_uri)[0])
-        cache_file = open(cache_uri,'wb')
-        pickle.dump(val, cache_file)
-        cache_file.close()
+        artifact_cache_dir = os.path.join(artifact_cache_dir, artifact_path)
+        if not os.path.exists(artifact_cache_dir):
+            os.makedirs(artifact_cache_dir)
+        cache_uri = active_data_handlers[data_handler].cache(val, artifact_cache_dir)
         
         return cache_uri
     
     def get_params(self, default_params=None):
+        if not self.params is None:
+            # Unpack Task params
+            unpacked_params = {}
+            for p, val in self.params.items():
+                if isinstance(val, Task):
+                    unpacked_params[p] = val.get_result()
+                else:
+                    unpacked_params[p] = val
+            return unpacked_params
+
         self.get_run()
         params = self.run.data.params or {}
-        
+
         # Add any given params
         if not default_params is None:
             default_params.update(params)
             params = default_params
-        
-        # List files in the params cache directory
-        params_cache_dir = os.path.join(cache_dir, self.experiment_id, self.run_id, "artifacts", "params")
-        cache_file_list = []
-        if os.path.exists(params_cache_dir):
-            cache_file_list = os.listdir(params_cache_dir)
-            # Filer out folders
-            cache_file_list = [os.path.join(params_cache_dir,f) for f in cache_file_list if os.path.isfile(os.path.join(params_cache_dir,f))]
-        
-        if (len(cache_file_list) == 0):
-            if not os.path.exists(params_cache_dir):
-                os.makedirs(params_cache_dir)
-            # no cache files found, download any from the log
-            try:
-                params_cache_dir = mlflow_client.download_artifacts(self.run.info.run_id, "params", params_cache_dir)
-                cache_file_list = os.listdir(params_cache_dir)
-                # Filter out folders
-                cache_file_list = [os.path.join(params_cache_dir,f) for f in cache_file_list if os.path.isfile(os.path.join(params_cache_dir,f))]
-            except Exception as e:
-                pass
 
-        # rehydrate params
-        for cache_uri in cache_file_list:
-            param_name = os.path.split(cache_uri)[1]
-            # Unpack the data into a variable
-            cache_file = open(cache_uri, 'rb')
-            params[param_name] = pickle.load(cache_file)
-            cache_file.close()
-        
-        return params
+        for p_name, p_val in params.items():
+            # Load param data handlers
+            param_handler = data_handler_from_path(p_val)
+            if not param_handler is None:
 
-    def get_cache_uri(self, artifact_path=None):
+                # Update with rehydrated values
+                p_val = param_handler.get()
+                params[p_name] = p_val
+        
+        self.params = params
+
+        return self.params
+
+    def get_cache_uri(self, artifact_path="result"):
         if self.cache_uri:
             return self.cache_uri
         
         cache_uri = None
         # List files in the result cache directory
-        task_cache_dir = os.path.join(cache_dir, self.experiment_id, self.run_id, "result")
-        try:
-            file_list = os.listdir(task_cache_dir)
-        except:
-            return None
-        file_list = [os.path.join(task_cache_dir,f) for f in file_list if os.path.isfile(os.path.join(task_cache_dir,f))]
-
-        if len(file_list) == 1:
-            cache_uri = file_list[0]
-        elif len(file_list) > 1:
-            cache_uri = file_list[0]
-            print(f"Found multiple result files found in cache! Taking the first one: {cache_uri}")
-        else:
-            print("No result files found in cache")
+        cache_uri = os.path.join(cache_dir, self.experiment_id, self.run_id, artifact_path)
             
         self.cache_uri = cache_uri
 
@@ -454,15 +432,7 @@ class Task:
         
         log_uri = None
         # List files in the log result directory
-        file_list = mlflow_client.list_artifacts(self.run_id, "result")
-
-        if len(file_list) == 1:
-            log_uri = file_list[0]
-        elif len(file_list) > 1:
-            log_uri = file_list[0]
-            print(f"Found multiple result files in log! Taking the first one: {log_uri}")
-        else:
-            print("No result files found in log")
+        log_uri = mlflow.get_artifact_uri("result")
             
         self.log_uri = log_uri
 
