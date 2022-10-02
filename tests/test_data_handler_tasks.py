@@ -80,3 +80,17 @@ def test_task_log_get_result():
     t2 = mlflow_tasks.Task(run_id = run_id)
     
     assert [1,2,3] == t2.get_result()
+
+def test_pass_cached_reloaded_task():
+    t = mlflow_tasks.Task(write_local_cache=True)
+
+    t.set_result([1,2,3])
+    run_id = t.run_id
+    del t
+
+    t = mlflow_tasks.Task(run_id = run_id)
+    def x(foo):
+        return foo
+    t2 = mlflow_tasks.Task(x, foo=t)
+    
+    assert [1,2,3] == t2.get_result()
