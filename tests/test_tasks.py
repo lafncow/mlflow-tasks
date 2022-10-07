@@ -36,47 +36,52 @@ mlflow.set_tracking_uri(f"file:/{test_tracking_folder}")
 # +
 # Test Task Methods
 def test_create_task():
-    task = mlflow_tasks.Task(experiment_name="Task Test Experiment")
+    task = mlflow_tasks.Task(experiment_name="test_create_task")
     task.end_run()
     assert isinstance(task, mlflow_tasks.Task)
 
 def test_create_task_named():
-    task = mlflow_tasks.Task(experiment_name="Task Test Experiment")
+    task = mlflow_tasks.Task(experiment_name="test_create_task_named")
     task.end_run()
-    assert task.experiment_name == "Task Test Experiment"
+    assert task.experiment_name == "test_create_task_named"
 
 def test_task_get_run():
-    task = mlflow_tasks.Task(experiment_name="Task Test Experiment")
+    task = mlflow_tasks.Task(experiment_name="test_task_get_run")
     run = task.get_run()
     task.end_run()
     assert isinstance(run, mlflow.entities.Run)
     
 def test_task_end_task():
-    task = mlflow_tasks.Task(experiment_name="Task Test Experiment")
+    task = mlflow_tasks.Task(experiment_name="test_task_end_task")
     task.end_run()
     assert task.get_run().info.status == "FINISHED"
 
 def test_task_set_result():
-    task = mlflow_tasks.Task(experiment_name="Task Test Experiment")
+    task = mlflow_tasks.Task(experiment_name="test_task_set_result")
     task.set_result(8)
     task.end_run()
     assert task.result == 8
 
 def test_task_get_result():
-    task = mlflow_tasks.Task(experiment_name="Task Test Experiment")
+    task = mlflow_tasks.Task(experiment_name="test_task_get_result")
     task.set_result(8)
     task.end_run()
     res = task.get_result()
     assert res == 8
     
 def test_task_get_params():
-    task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="Task Test Experiment")
+    task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="test_task_get_params")
     params = task.get_params()
     task.end_run()
     assert params['x'] == 8
 
 def test_task_exec_func():
-    task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="Task Test Experiment")
+    task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="test_task_exec_func")
     res = task.get_result()
     task.end_run()
     assert res == 7
+
+def test_task_exec_script():
+    task = mlflow_tasks.Task("tests/script.py", test_param=8, experiment_name="test_task_exec_script", cache_local=True)
+    res = task.get_result()
+    assert res == 16
