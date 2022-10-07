@@ -69,7 +69,7 @@ class Py_Obj_Handler:
         return self.__data__
     
     def cache_local(self):
-        # Write to cache accessible outside of this machine
+        # Write to cache accessible inside of this machine
         local_cache_array = [self.cache_dir] + self.full_path.split("/")
         local_cache_uri = os.path.join(*local_cache_array)
         local_cache_dir = os.path.split(local_cache_uri)[:-1]
@@ -94,9 +94,9 @@ class Py_Obj_Handler:
         metadata_file_name = self.full_path.split("/")[-1] + "_meta.yaml"
         metadata_path = [self.cache_dir] + self.full_path.split("/")[:-1] + [metadata_file_name]
         metadata_path = os.path.join(*metadata_path)
-        with open(metadata_file_name, 'w') as metadata_file:
+        with open(metadata_path, 'w') as metadata_file:
             yaml.dump(metadata, metadata_file)
-        self.mlflow_client.log_artifact(self.run_id, metadata_file_name)
+        self.mlflow_client.log_artifact(self.run_id, metadata_path)
         
         # Set cache uri
         self.local_cache_uri = local_cache_uri

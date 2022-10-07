@@ -25,10 +25,16 @@ def data_handler_from_path(full_path):
     metadata_uri = full_path + "_meta.yaml"
     run_id = metadata_uri.split("/")[1]
     experiment_id = metadata_uri.split("/")[0]
-    metadata_path = "/".join(metadata_uri.split("/")[2:])
+    metadata_path = metadata_uri.split("/")[2:]
+    metadata_path = os.path.join(*metadata_path)
+    metadata_array = metadata_uri.split("/")
+    local_metadata_uri = os.path.join(cache_dir, *metadata_array)
+    metadata_array = full_path.split("/")[:-1]
+    local_dir = os.path.join(cache_dir, *metadata_array)
+    os.makedirs(local_dir, exist_ok=True)
     # Download metadata from log
     try:
-        local_metadata_uri = mlflow_client.download_artifacts(run_id, metadata_path)
+        local_metadata_uri = mlflow_client.download_artifacts(run_id, metadata_path, local_dir)
     except:
         raise Exception(f"No metadata found at {metadata_path}. Could not get data handler for {full_path}.")
     # Read the metadata
@@ -197,7 +203,7 @@ class Task:
             "MLFLOW_TRACKING_URI": mlflow.tracking.get_tracking_uri(),
             "MLFLOW_EXPERIMENT_NAME": self.experiment_name,
             "MLFLOW_RUN_ID": str(self.run_id),
-            "FLOW_LOG_RESULT": str(self.write_log)
+            "FLOW_LOG_RESULT": str(True)
         })
         
         # Convert parameters into commandline arguments
@@ -230,7 +236,7 @@ class Task:
         os.environ["MLFLOW_TRACKING_URI"] = mlflow.tracking.get_tracking_uri()
         os.environ["MLFLOW_EXPERIMENT_NAME"] = self.experiment_name
         os.environ["MLFLOW_RUN_ID"] = str(self.run_id)
-        os.environ["FLOW_LOG_RESULT"] = str(self.write_log)
+        os.environ["FLOW_LOG_RESULT"] = str(True)
 
         nb_name = os.path.splitext(os.path.split(nb_path)[1])[0]
         nb_result_name = nb_name+"_result.ipynb"
