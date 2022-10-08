@@ -2,6 +2,7 @@ import os
 import pickle
 import yaml
 import mlflow
+from .utility import *
 from mlflow.tracking import MlflowClient
 
 class Py_Obj_Handler:
@@ -28,17 +29,19 @@ class Py_Obj_Handler:
         if full_path is None:
             return None
         self.full_path = full_path
+        experiment_id, run_id, log_path = path_to_exp_run_path(full_path)
+        self.run_id = run_id
+        self.experiment_id = experiment_id
+        self.path = log_path
 
         # Check local cache
         # Create cache uri
-        local_cache_uri = [self.cache_dir] + self.full_path.split("/")
-        local_cache_uri = os.path.join(*local_cache_uri)
+        local_cache_dir, local_cache_uri = path_to_dir_uri(full_path, self.cache_dir)
         # Pull data from cache
         try:
-            cache_file = open(local_cache_uri, 'rb')
-            dataset = pickle.load(cache_file)
-            self.__data__ = dataset
-            cache_file.close()
+            with open(local_cache_uri, 'rb') as cache_file:
+                self.__data__ = pickle.load(cache_file)
+                        
             # Set cache uri
             self.local_cache_uri = local_cache_uri
         except:
@@ -49,35 +52,26 @@ class Py_Obj_Handler:
             # Check log
             # Create log uri
             
-            log_path = full_path.split("/")[2:]
             # Download from log
-            self.mlflow_client.download_artifact(self.run_id, log_path, local_cache_uri)
-            cache_file = open(local_cache_uri, 'rb')
-            dataset = pickle.load(cache_file)
-            self.__data__ = dataset
-            cache_file.close()
+            self.mlflow_client.download_artifacts(self.run_id, self.path, local_cache_dir)
+            print(f"DH.load {self.path} to {local_cache_dir}")
+            with open(local_cache_uri, 'rb') as cache_file:
+                self.__data__ = pickle.load(cache_file)
+            
             # Set cache uri
             self.local_cache_uri = local_cache_uri
-            self.global_cache_uri = log_path
-            self.log_uri = log_path
-        
-        self.full_path = full_path
-        self.experiment_id = full_path.split("/")[0]
-        self.run_id = full_path.split("/")[1]
-        self.path = full_path.split("/")[2:]
+            self.global_cache_uri = self.path
+            self.log_uri = self.path
         
         return self.__data__
     
     def cache_local(self):
         # Write to cache accessible inside of this machine
-        local_cache_array = [self.cache_dir] + self.full_path.split("/")
-        local_cache_uri = os.path.join(*local_cache_array)
-        local_cache_dir = os.path.split(local_cache_uri)[:-1]
-        local_cache_dir = os.path.join(*local_cache_dir)
+        local_cache_dir, local_cache_uri = path_to_dir_uri(self.full_path, self.cache_dir)
+        
         os.makedirs(local_cache_dir, exist_ok=True)
-        cache_file = open(local_cache_uri,'wb')
-        pickle.dump(self.__data__, cache_file)
-        cache_file.close()
+        with open(local_cache_uri,'wb') as cache_file:
+            pickle.dump(self.__data__, cache_file)
         
         # Create Metadata
         metadata = {
@@ -90,14 +84,14 @@ class Py_Obj_Handler:
             },
             "full_path": self.full_path
         }
-        # Save metadata to yaml
-        metadata_file_name = self.full_path.split("/")[-1] + "_meta.yaml"
-        metadata_path = [self.cache_dir] + self.full_path.split("/")[:-1] + [metadata_file_name]
-        metadata_path = os.path.join(*metadata_path)
-        with open(metadata_path, 'w') as metadata_file:
-            yaml.dump(metadata, metadata_file)
-        self.mlflow_client.log_artifact(self.run_id, metadata_path)
         
+        # Save metadata to yaml
+        local_meta_dir, local_meta_uri = path_to_metadata_dir_uri(self.full_path, self.cache_dir)
+        
+        with open(local_meta_uri, 'w') as metadata_file:
+            yaml.dump(metadata, metadata_file)
+        self.mlflow_client.log_artifact(self.run_id, local_meta_uri, self.path)
+        print(f"DH.cache_local {self.path} to {local_cache_uri} and {local_meta_uri}")
         # Set cache uri
         self.local_cache_uri = local_cache_uri
         
@@ -107,17 +101,16 @@ class Py_Obj_Handler:
         # Save to local dir first
         if self.local_cache_uri is None:
             self.cache_local()
-             
-        log_uri = "/".join(self.full_path.split("/")[2:])
-        self.mlflow_client.log_artifact(self.run_id, self.local_cache_uri, log_uri)
         
-        self.log_uri = log_uri
+        self.mlflow_client.log_artifact(self.run_id, self.local_cache_uri, self.path)
+        self.log_uri = self.full_path
 
-        return self.log_uri
+        return self.full_path
     
     def cache_global(self):
         # Write to cache accessible outside of this machine
         log_uri = self.log()
+        self.global_cache_uri = log_uri
         return log_uri
 
     def set(self, dataset, experiment_id, run_id, path):

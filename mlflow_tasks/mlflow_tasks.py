@@ -16,27 +16,23 @@ active_data_handlers = {
     "py_obj": data_handlers.Py_Obj_Handler
 }
 
+special_task_params = ['write_log', 'write_local_cache', 'write_global_cache', 'autolog']
+
 # TODO make this adjustable, maybe with env variable?
 cache_dir = os.path.join(os.path.abspath(''), "mlflow_tasks_cache")
 
 def data_handler_from_path(full_path):
     import yaml
     mlflow_client = MlflowClient()
-    metadata_uri = full_path + "_meta.yaml"
-    run_id = metadata_uri.split("/")[1]
-    experiment_id = metadata_uri.split("/")[0]
-    metadata_path = metadata_uri.split("/")[2:]
-    metadata_path = os.path.join(*metadata_path)
-    metadata_array = metadata_uri.split("/")
-    local_metadata_uri = os.path.join(cache_dir, *metadata_array)
-    metadata_array = full_path.split("/")[:-1]
-    local_dir = os.path.join(cache_dir, *metadata_array)
+    experiment_id, run_id, log_path = data_handlers.path_to_exp_run_path(full_path)
+    local_dir, local_metadata_uri = data_handlers.path_to_metadata_dir_uri(full_path, cache_dir)
     os.makedirs(local_dir, exist_ok=True)
     # Download metadata from log
     try:
-        local_metadata_uri = mlflow_client.download_artifacts(run_id, metadata_path, local_dir)
+        print(f"data_handler_from_path {log_path} to {local_dir} and {local_metadata_uri}")
+        mlflow_client.download_artifacts(run_id, log_path, local_dir)
     except:
-        raise Exception(f"No metadata found at {metadata_path}. Could not get data handler for {full_path}.")
+        print(f"No metadata found at {log_path}. Could not get data handler for {full_path}.")
     # Read the metadata
     with open(local_metadata_uri, 'r') as metadata_file:
         metadata = yaml.safe_load(metadata_file)
@@ -44,7 +40,6 @@ def data_handler_from_path(full_path):
     data_handler_name = metadata['data_handler']
     if not data_handler_name in data_handlers.__dict__:
         raise Exception(f"Data handler {data_handler_name} not found.")
-        return None
     # Create data handler
     data_handler = data_handlers.__dict__[data_handler_name](**metadata['handler_args'])
     # Load the data
@@ -86,6 +81,7 @@ class Task:
         self.write_global_cache = write_global_cache
         self.log_nb_html = log_nb_html
         self.params = params
+        self.autolog = autolog
         
         if "FLOW_LOG_RESULT" in os.environ:
             if (os.environ["FLOW_LOG_RESULT"] == "True") or (os.environ["FLOW_LOG_RESULT"] == "TRUE"):
@@ -127,18 +123,35 @@ class Task:
         self.run_id = self.run.info.run_id
         self.experiment_id = self.run.info.experiment_id
         self.experiment_name = mlflow.get_experiment(self.run.info.experiment_id).name
+
+        ## Load task params
+        for p in special_task_params:
+            if p in self.run.data.tags:
+                param_val = self.run.data.tags[p]
+                if param_val == "True":
+                    param_val = True
+                elif param_val == "False":
+                    param_val = False
+                self.__setattr__(p, param_val)
         
+        ## Create the data handler
         if data_handler is None:
-            self.data_handler = active_data_handlers['default'](self.experiment_id, self.run_id, "result")
+            self.data_handler = active_data_handlers['default'](cache_dir, self.experiment_id, self.run_id, "result")
         else:
             self.data_handler = data_handler
+
+        ## Save task params
+        for p in special_task_params:
+            param_val = self.__getattribute__(p)
+            if param_val:
+                mlflow.set_tag(p, param_val)
         
         self.print_status()
         
-        if autolog:
+        if self.autolog:
             mlflow.autolog()
-            self.autolog = True
 
+        ## Execute the action for the task
         if not action is None:
             end_status = "FAILED"
             # It is a function
@@ -318,6 +331,7 @@ class Task:
                 params_as_strs[p] = p_handler.full_path
 
         mlflow.log_params(params_as_strs)
+        self.get_run()
 
         return params_as_strs
 
@@ -386,35 +400,25 @@ class Task:
         
         return cache_uri
     
-    def get_params(self, default_params=None):
-        if not self.params is None:
-            # Unpack Task params
-            unpacked_params = {}
-            for p, val in self.params.items():
-                if isinstance(val, Task):
-                    unpacked_params[p] = val.get_result()
+    def get_params(self):
+        # Collect all params from log and combine with params passed to Task()
+        logged_param_strings = self.run.data.params
+        for key, val in logged_param_strings.items():
+            # Check if we have it
+            if not key in self.params:
+                # Load param data handlers
+                param_handler = data_handler_from_path(val)
+                if not param_handler is None:
+                    # Unpack value
+                    self.params[key] = param_handler.get()
                 else:
-                    unpacked_params[p] = val
-            return unpacked_params
+                    # No data handler needed
+                    self.params[key] = val
 
-        self.get_run()
-        params = self.run.data.params or {}
-
-        # Add any given params
-        if not default_params is None:
-            default_params.update(params)
-            params = default_params
-
-        for p_name, p_val in params.items():
-            # Load param data handlers
-            param_handler = data_handler_from_path(p_val)
-            if not param_handler is None:
-
-                # Update with rehydrated values
-                p_val = param_handler.get()
-                params[p_name] = p_val
-        
-        self.params = params
+        # Upack any passed params that are tasks
+        for key, val in self.params.items():
+            if isinstance(val, Task):
+                    self.params[key] = val.get_result() 
 
         return self.params
 
