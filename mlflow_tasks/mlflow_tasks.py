@@ -73,23 +73,18 @@ def register_data_handler(handler_name, handler):
     active_data_handlers[handler_name] = handler
 
 class Task:
-    def __init__(self, action=None, run_id=None, experiment_id=None, experiment_name=None, write_log=False, write_local_cache=False, write_global_cache=False, autolog=True, log_nb_html=True, data_handler=None, **params):
+    def __init__(self, action=None, run_id=None, experiment_id=None, experiment_name=None, write_log=False, write_local_cache=False, write_global_cache=False, autolog=True, data_handler=None, **params):
         self.result = None
         self.run = None
         self.write_log = write_log
         self.write_local_cache = write_local_cache
         self.write_global_cache = write_global_cache
-        self.log_nb_html = log_nb_html
         self.params = params
         self.autolog = autolog
         
         if "FLOW_LOG_RESULT" in os.environ:
             if (os.environ["FLOW_LOG_RESULT"] == "True") or (os.environ["FLOW_LOG_RESULT"] == "TRUE"):
                 self.write_log = True
-
-        if "FLOW_LOG_NB_HTML" in os.environ:
-            if (os.environ["FLOW_LOG_NB_HTML"] == "True") or (os.environ["FLOW_LOG_NB_HTML"] == "TRUE"):
-                self.log_nb_html = True
 
         action_name = None
 
@@ -254,6 +249,7 @@ class Task:
         nb_name = os.path.splitext(os.path.split(nb_path)[1])[0]
         nb_result_name = nb_name+"_result.ipynb"
         nb_result_path = os.path.join(cache_dir, self.experiment_id, self.run_id, "artifacts", nb_result_name)
+        os.makedirs(os.path.join(cache_dir, self.experiment_id, self.run_id, "artifacts"), exist_ok=True)
         
         # Run the notebook
         papermill.execute_notebook(
@@ -265,19 +261,18 @@ class Task:
         # Reset the MLFlow environment variables
         os.environ = env_old
         
-        if self.log_nb_html:
-            """Export the notebook to HTML and return the path"""
-            html_path = nb_result_path.split(".")[0] + ".html"
-            # Create HTML exporter
-            html_exporter = HTMLExporter()
-            html_exporter.template_name = 'classic'
-            (html_text, resources) = html_exporter.from_filename(nb_result_path)
-            html_file = open(html_path,'wb')
-            html_file.write(html_text.encode("utf-8"))
-            html_file.close()
-            mlflow.log_artifact(html_path)
-            #mlflow.log_text(html_text.encode("utf-8"), html_path)
-            print(f"HTML Report was generated: {html_path}")
+        """Export the notebook to HTML and return the path"""
+        html_path = nb_result_path.split(".")[0] + ".html"
+        # Create HTML exporter
+        html_exporter = HTMLExporter()
+        html_exporter.template_name = 'classic'
+        (html_text, resources) = html_exporter.from_filename(nb_result_path)
+        html_file = open(html_path,'wb')
+        html_file.write(html_text.encode("utf-8"))
+        html_file.close()
+        mlflow.log_artifact(html_path)
+        #mlflow.log_text(html_text.encode("utf-8"), html_path)
+        print(f"HTML Report was generated: {html_path}")
         
         # End the run
         return "FINISHED"
