@@ -30,7 +30,7 @@ def data_handler_from_path(full_path):
     # Download metadata from log
     try:
         print(f"data_handler_from_path {log_path} to {local_dir} and {local_metadata_uri}")
-        mlflow_client.download_artifacts(run_id, log_path, local_dir)
+        mlflow_client.download_artifacts(run_id, log_path, os.path.join(cache_dir, experiment_id, run_id))
     except:
         print(f"No metadata found at {log_path}. Could not get data handler for {full_path}.")
     # Read the metadata
@@ -138,7 +138,7 @@ class Task:
         if data_handler is None:
             self.data_handler = active_data_handlers['default'](cache_dir, self.experiment_id, self.run_id, "result")
         else:
-            self.data_handler = data_handler
+            self.data_handler = data_handler(cache_dir, self.experiment_id, self.run_id, "result")
 
         ## Save task params
         for p in special_task_params:
@@ -186,7 +186,7 @@ class Task:
     def __exec_func__(self, func):
         # TODO add func to run information
         # Log params
-        self.__log_params__()
+        self.__log_params__(cache_local=True)
         
         # Unpack Task params
         unpacked_params = {}
@@ -310,16 +310,19 @@ class Task:
             elif isinstance(val, Task):
                 p_handler = val.data_handler
                 if cache_local:
+                    p_handler.get()
                     p_handler.cache_local()
                 if cache_global:
+                    p_handler.get()
                     p_handler.cache_global()
                 if write_log:
+                    p_handler.get()
                     p_handler.log()
                 params_as_strs[p] = p_handler.full_path
                 
             else:
                 sub_path = "/".join(["params", p])
-                p_handler = active_data_handlers['default']()
+                p_handler = active_data_handlers['default'](cache_dir)
                 p_handler.set(val, self.experiment_id, self.run_id, sub_path)
                 
                 if cache_local:
@@ -354,12 +357,12 @@ class Task:
         return self.data_handler
     
     def get_result(self):
-        if self.data_handler is None:
-            self.data_handler = data_handler_from_path("/".join([self.experiment_id, self.run_id, "result"]))
+        #if self.data_handler is None:
+            #self.data_handler = data_handler_from_path("/".join([self.experiment_id, self.run_id, "result"]))
         result = self.data_handler.get()
-        if result is None:
-            self.data_handler = data_handler_from_path("/".join([self.experiment_id, self.run_id, "result"]))
-            result = self.data_handler.get()
+        #if result is None:
+            #self.data_handler = data_handler_from_path("/".join([self.experiment_id, self.run_id, "result"]))
+            #result = self.data_handler.get()
         return result
     
     def log_result(self, result):
