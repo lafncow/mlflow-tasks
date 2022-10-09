@@ -186,7 +186,7 @@ class Task:
     def __exec_func__(self, func):
         # TODO add func to run information
         # Log params
-        self.__log_params__(cache_local=True)
+        self.__log_params__()
         
         # Unpack Task params
         unpacked_params = {}
