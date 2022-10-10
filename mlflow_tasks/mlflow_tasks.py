@@ -9,43 +9,15 @@ import papermill
 import shutil
 from typing import Callable
 from mlflow.entities import RunStatus
-from . import data_handlers
+from .data_handlers import Py_Obj_Handler
+from .data_handlers.utility import cache_dir, data_handler_from_path
 
 active_data_handlers = {
-    "default": data_handlers.Py_Obj_Handler,
-    "py_obj": data_handlers.Py_Obj_Handler
+    "default": Py_Obj_Handler,
+    "py_obj": Py_Obj_Handler
 }
 
 special_task_params = ['write_log', 'write_local_cache', 'write_global_cache', 'autolog']
-
-# TODO make this adjustable, maybe with env variable?
-cache_dir = os.path.join(os.path.abspath(''), "mlflow_tasks_cache")
-
-def data_handler_from_path(full_path):
-    import yaml
-    mlflow_client = MlflowClient()
-    experiment_id, run_id, log_path = data_handlers.path_to_exp_run_path(full_path)
-    local_dir, local_metadata_uri = data_handlers.path_to_metadata_dir_uri(full_path, cache_dir)
-    os.makedirs(local_dir, exist_ok=True)
-    # Download metadata from log
-    try:
-        print(f"data_handler_from_path {log_path} to {local_dir} and {local_metadata_uri}")
-        mlflow_client.download_artifacts(run_id, log_path, os.path.join(cache_dir, experiment_id, run_id))
-    except:
-        print(f"No metadata found at {log_path}. Could not get data handler for {full_path}.")
-    # Read the metadata
-    with open(local_metadata_uri, 'r') as metadata_file:
-        metadata = yaml.safe_load(metadata_file)
-    # Find the right data handler
-    data_handler_name = metadata['data_handler']
-    if not data_handler_name in data_handlers.__dict__:
-        raise Exception(f"Data handler {data_handler_name} not found.")
-    # Create data handler
-    data_handler = data_handlers.__dict__[data_handler_name](**metadata['handler_args'])
-    # Load the data
-    data_handler.load(metadata['full_path'])
-    
-    return data_handler
 
 def get_or_create_experiment(experiment_name):
     experiment = mlflow.get_experiment_by_name(experiment_name)
@@ -138,7 +110,7 @@ class Task:
         ## Save task params
         for p in special_task_params:
             param_val = self.__getattribute__(p)
-            if param_val:
+            if not param_val is None:
                 mlflow.set_tag(p, param_val)
         
         self.print_status()
@@ -352,51 +324,8 @@ class Task:
         return self.data_handler
     
     def get_result(self):
-        #if self.data_handler is None:
-            #self.data_handler = data_handler_from_path("/".join([self.experiment_id, self.run_id, "result"]))
         result = self.data_handler.get()
-        #if result is None:
-            #self.data_handler = data_handler_from_path("/".join([self.experiment_id, self.run_id, "result"]))
-            #result = self.data_handler.get()
         return result
-    
-    def log_result(self, result):
-        self.result = result
-        
-        # Save result to a file
-        cache_uri = self.cache_result(result)
-
-        # Log result to MLFlow
-        mlflow.log_artifact(cache_uri)
-        
-        log_uri = self.get_log_uri()
-        self.log_uri = log_uri
-        
-        return log_uri
-    
-    def cache_result(self, result):
-        self.result = result
-        
-        result_dir = os.path.join(cache_dir, self.run.info.experiment_id, self.run.info.run_id, "result")
-        if not os.path.exists(result_dir):
-            os.makedirs(result_dir)
-        cache_uri = self.data_handler.cache(result, result_dir)
-
-        self.cache_uri = cache_uri
-        
-        return cache_uri
-    
-    def cache_artifact(self, val, artifact_path, data_handler="default"):
-        
-        # TODO make internal method
-        
-        artifact_cache_dir = os.path.join(cache_dir, self.run.info.experiment_id, self.run.info.run_id, "artifacts")
-        artifact_cache_dir = os.path.join(artifact_cache_dir, artifact_path)
-        if not os.path.exists(artifact_cache_dir):
-            os.makedirs(artifact_cache_dir)
-        cache_uri = active_data_handlers[data_handler].cache(val, artifact_cache_dir)
-        
-        return cache_uri
     
     def get_params(self):
         # Collect all params from log and combine with params passed to Task()
@@ -420,30 +349,6 @@ class Task:
 
         return self.params
 
-    def get_cache_uri(self, artifact_path="result"):
-        if self.cache_uri:
-            return self.cache_uri
-        
-        cache_uri = None
-        # List files in the result cache directory
-        cache_uri = os.path.join(cache_dir, self.experiment_id, self.run_id, artifact_path)
-            
-        self.cache_uri = cache_uri
-
-        return cache_uri
-
-    def get_log_uri(self):
-        if self.log_uri:
-            return self.log_uri
-        
-        log_uri = None
-        # List files in the log result directory
-        log_uri = mlflow.get_artifact_uri("result")
-            
-        self.log_uri = log_uri
-
-        return log_uri
-    
     def print_status(self):
         status = self.get_run().info.status
         print(f"TASK: {self.experiment_name} {status} {self.experiment_id} / {self.run_id}")
