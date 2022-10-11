@@ -82,11 +82,11 @@ def test_task_exec_func():
     assert res == 7
 
 def test_task_exec_script():
-    task = mlflow_tasks.Task("tests/script.py", test_param=8, experiment_name="test_task_exec_script", write_local_cache=True)
+    task = mlflow_tasks.Task("tests/script.py", test_param=8, experiment_name="test_task_exec_script")
     res = task.get_result()
     assert res == 16
 
 def test_task_exec_nb():
-    task = mlflow_tasks.Task("tests/notebook.ipynb", test_param=8, experiment_name="test_task_exec_nb", write_local_cache=True)
+    task = mlflow_tasks.Task("tests/notebook.ipynb", test_param=8, experiment_name="test_task_exec_nb")
     res = task.get_result()
     assert res == 16
