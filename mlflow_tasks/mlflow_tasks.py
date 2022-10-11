@@ -19,6 +19,8 @@ active_data_handlers = {
 
 special_task_params = ['write_log', 'write_local_cache', 'write_global_cache', 'autolog']
 
+active_task_stack = []
+
 def get_or_create_experiment(experiment_name):
     experiment = mlflow.get_experiment_by_name(experiment_name)
     if not experiment:
@@ -46,6 +48,14 @@ def register_data_handler(handler_name, handler):
 
 class Task:
     def __init__(self, action=None, run_id=None, experiment_id=None, experiment_name=None, write_log=False, write_local_cache=False, write_global_cache=False, autolog=True, data_handler=None, **params):
+        # If there is an active Task, then this is being run in a script Task
+        if len(active_task_stack) > 0:
+            # Pop the active Task off of the stack and assume it
+            # Note arguments to Task() inside the script are being ignored
+            self_task = active_task_stack.pop()
+            self.__dict__ = self_task.__dict__
+            return None
+            
         self.result = None
         self.run = None
         self.write_log = write_log
@@ -177,36 +187,18 @@ class Task:
     def __exec_script__(self, script_path):
         # Log params
         # TODO add script_path to run information
-        clean_params = self.__log_params__(cache_local=True)
+        clean_params = self.__log_params__()
         
-        # Set MLFlow environment variables
-        new_env = os.environ.copy()
-        new_env.update({
-            "MLFLOW_TRACKING_URI": mlflow.tracking.get_tracking_uri(),
-            "MLFLOW_EXPERIMENT_NAME": self.experiment_name,
-            "MLFLOW_RUN_ID": str(self.run_id),
-            "FLOW_LOG_RESULT": str(True)
-        })
+        # Save self task to a local variable
+        active_task_stack.append(self)
+        loc_vars = {"active_task_stack": active_task_stack}
+        # Run the script with access to the local variable
+        with open(script_path) as script_file:
+            script_code = script_file.read()
+            exec(script_code, {}, loc_vars)
         
-        # Convert parameters into commandline arguments
-        args = ["python", script_path]
-        for key, val in clean_params.items():
-            args.append(f"-{key}")
-            args.append(str(val))
-        
-        # Run the task as a subprocess
-        process_res = subprocess.run(args, env=new_env, capture_output=True)
-        
-        print(process_res.stdout)
-        
-        # Check if task was successful
-        if process_res.returncode != 0:
-            # End the run
-            print(process_res.stderr)
-            return "FAILED"
-        else:
-            # End the run
-            return "FINISHED"
+        # End the run
+        return "FINISHED"
         
     def __exec_nb__(self, nb_path):
         # TODO add nb_path to run information
