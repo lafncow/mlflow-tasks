@@ -1,0 +1,7 @@
+.ipynb_checkpoints/
+.pytest_cache/
+mlruns/
+test_mlruns/
+mlflow_tasks_cache/
+*.pyc
+mlflow_tasks.egg-info/

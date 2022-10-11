@@ -39,14 +39,13 @@ class Py_Obj_Handler:
         local_cache_dir, local_cache_uri = path_to_dir_uri(full_path, self.cache_dir)
         # Pull data from cache
         try:
-            print(f"DH.load cache seek: {local_cache_uri}")
+            #print(f"DEBUG DH.load cache seek: {local_cache_uri}")
             with open(local_cache_uri, 'rb') as cache_file:
                 self.__data__ = pickle.load(cache_file)
-            print(self.__data__)       
             # Set cache uri
             self.local_cache_uri = local_cache_uri
         except:
-            print(f"DH.load cache miss: {local_cache_uri}")
+            #print(f"DEBUG DH.load cache miss: {local_cache_uri}")
             pass
 
         if self.__data__ is None:
@@ -56,7 +55,7 @@ class Py_Obj_Handler:
             
             # Download from log
             
-            print(f"DH.load download {self.path} to {local_cache_dir}")
+            #print(f"DEBUG DH.load download {self.path} to {local_cache_dir}")
             os.makedirs(local_cache_dir, exist_ok=True)
             self.mlflow_client.download_artifacts(self.run_id, self.path, os.path.join(self.cache_dir, self.experiment_id, self.run_id))
             
@@ -96,7 +95,7 @@ class Py_Obj_Handler:
         with open(local_meta_uri, 'w') as metadata_file:
             yaml.dump(metadata, metadata_file)
         self.mlflow_client.log_artifact(self.run_id, local_meta_uri, self.path)
-        print(f"DH.cache_local {self.path} ({self.__data__}) to {local_cache_uri} and {local_meta_uri}")
+        #print(f"DEBUG DH.cache_local {self.path} ({self.__data__}) to {local_cache_uri} and {local_meta_uri}")
         # Set cache uri
         self.local_cache_uri = local_cache_uri
         
