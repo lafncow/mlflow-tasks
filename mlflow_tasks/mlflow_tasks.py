@@ -67,6 +67,8 @@ class Task:
             # It is a string
             elif isinstance(action, str):
                 action_name = os.path.basename(action)
+                if action[-3:] == ".py" or action[-6:] == ".ipynb":
+                    self.write_local_cache = True
                 if (action_name is None) or (action_name == ""):
                     # May be needed for running model uris
                     print(f"DEBUG: needed to set action_name differently for model URI {action} -> {os.path.split(action)[-1]}")
@@ -100,7 +102,7 @@ class Task:
                 elif param_val == "False":
                     param_val = False
                 self.__setattr__(p, param_val)
-        
+
         ## Create the data handler
         if data_handler is None:
             self.data_handler = active_data_handlers['default'](cache_dir, self.experiment_id, self.run_id, "result")
