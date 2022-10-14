@@ -5,6 +5,9 @@ on:
 
 jobs:
   pytest:
+    defaults:
+      run:
+        shell: bash -l {0}
     runs-on: ubuntu-latest
 
     steps:
@@ -17,13 +20,16 @@ jobs:
         python-version: 3.9
 
     - name: Install dependencies
-      run: sudo pip install -r requirements.txt
+      run: pip install -r requirements.txt
 
-    - name: Prep conda
-      run: sudo conda env create -f environment.yml & sudo conda activate mlflow_tasks_dev
+    uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: mlflow_tasks_dev
+          environment-file: environment.yml
+          auto-activate-base: false
 
     - name: Install PyTest
-      run: sudo pip install pytest
+      run: conda install pytest
 
     - name: Run Pytest
-      run: sudo pytest
+      run: pytest
