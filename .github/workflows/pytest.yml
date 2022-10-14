@@ -23,4 +23,4 @@ jobs:
       run: pip install pytest
 
     - name: Run Pytest
-      run: sudo pytest
+      run: sudo python -m pytest
