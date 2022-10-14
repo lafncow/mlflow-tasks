@@ -24,10 +24,10 @@ jobs:
 
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
-        with:
-          activate-environment: mlflow_tasks_dev
-          environment-file: environment.yml
-          auto-activate-base: false
+      with:
+        activate-environment: mlflow_tasks_dev
+        environment-file: environment.yml
+        auto-activate-base: false
 
     - name: Install PyTest
       run: conda install pytest
