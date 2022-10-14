@@ -19,6 +19,9 @@ jobs:
     - name: Install dependencies
       run: sudo pip install -r requirements.txt
 
+    - name: Prep conda
+      run: sudo conda env create -f environment.yml & sudo conda activate mlflow_tasks_dev
+
     - name: Install PyTest
       run: sudo pip install pytest
 
