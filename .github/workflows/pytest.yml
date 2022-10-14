@@ -17,10 +17,10 @@ jobs:
         python-version: 3.9
 
     - name: Install dependencies
-      run: pip install -r requirements.txt
+      run: sudo pip install -r requirements.txt
 
     - name: Install PyTest
-      run: pip install pytest
+      run: sudo pip install pytest
 
     - name: Run Pytest
-      run: pytest
+      run: sudo pytest
