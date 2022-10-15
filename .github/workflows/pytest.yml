@@ -31,4 +31,9 @@ jobs:
 
     - name: Run Pytest
       run: |
+        python -m nb_conda_kernels list
+        jupyter kernelspec list
+        echo "{\"CondaKernelSpecManager\": {\"kernelspec_path\": \"--user\"}}" > ~/.jupyter/jupyter_config.json
+        python -m nb_conda_kernels list
+        jupyter kernelspec list
         pytest -W ignore
