@@ -19,9 +19,6 @@ jobs:
       with:
         python-version: 3.9
 
-    - name: Install dependencies
-      run: sudo pip install -r requirements.txt
-
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
@@ -30,4 +27,5 @@ jobs:
         auto-activate-base: false
 
     - name: Run Pytest
-      run: sudo pytest
+      run: |
+        pytest -W ignore
