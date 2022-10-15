@@ -1,0 +1,13 @@
+name: mlflow_tasks_dev
+channels:
+  - conda-forge
+  - defaults
+ dependencies:
+  - nb_conda_kernels
+  - nbconvert=6.4.0
+  - nbformat=5.1.3
+  - papermill=2.3.3
+  - pip
+  - pytest
+  - pip:
+    - mlflow==1.29.0

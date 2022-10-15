@@ -20,17 +20,14 @@ jobs:
         python-version: 3.9
 
     - name: Install dependencies
-      run: pip install -r requirements.txt
+      run: sudo pip install -r requirements.txt
 
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
         activate-environment: mlflow_tasks_dev
-        environment-file: environment.yml
+        environment-file: tests/environment.yml
         auto-activate-base: false
 
-    - name: Install PyTest
-      run: conda install pytest
-
     - name: Run Pytest
-      run: pytest
+      run: sudo pytest
