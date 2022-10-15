@@ -33,6 +33,7 @@ jobs:
       run: |
         python -m nb_conda_kernels list
         jupyter kernelspec list
+        mkdir ~/.jupyter
         echo "{\"CondaKernelSpecManager\": {\"kernelspec_path\": \"--user\"}}" > ~/.jupyter/jupyter_config.json
         python -m nb_conda_kernels list
         jupyter kernelspec list
