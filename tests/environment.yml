@@ -2,7 +2,7 @@ name: mlflow_tasks_dev
 channels:
   - conda-forge
   - defaults
- dependencies:
+dependencies:
   - nb_conda_kernels
   - nbconvert=6.4.0
   - nbformat=5.1.3
