@@ -46,26 +46,27 @@ class Py_Obj_Handler:
             self.local_cache_uri = local_cache_uri
         except:
             #print(f"DEBUG DH.load cache miss: {local_cache_uri}")
-            pass
 
-        if self.__data__ is None:
-            # Check global cache
-            # Check log
-            # Create log uri
-            
-            # Download from log
-            
-            #print(f"DEBUG DH.load download {self.path} to {local_cache_dir}")
-            os.makedirs(local_cache_dir, exist_ok=True)
-            self.mlflow_client.download_artifacts(self.run_id, self.path, os.path.join(self.cache_dir, self.experiment_id, self.run_id))
-            
-            with open(local_cache_uri, 'rb') as cache_file:
-                self.__data__ = pickle.load(cache_file)
-            
-            # Set cache uri
-            self.local_cache_uri = local_cache_uri
-            self.global_cache_uri = self.path
-            self.log_uri = self.path
+            try:
+                # Check global cache
+                # Check log
+                # Create log uri
+
+                # Download from log
+
+                #print(f"DEBUG DH.load download {self.path} to {local_cache_dir}")
+                os.makedirs(local_cache_dir, exist_ok=True)
+                self.mlflow_client.download_artifacts(self.run_id, self.path, os.path.join(self.cache_dir, self.experiment_id, self.run_id))
+
+                with open(local_cache_uri, 'rb') as cache_file:
+                    self.__data__ = pickle.load(cache_file)
+
+                # Set cache uri
+                self.local_cache_uri = local_cache_uri
+                self.global_cache_uri = self.path
+                self.log_uri = self.path
+            except:
+                pass
         
         return self.__data__
     
