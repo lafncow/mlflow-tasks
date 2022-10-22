@@ -245,9 +245,12 @@ class Task:
 
     def __exec_model__(self, model_uri, model_input):
         # TODO change they way model_uri is recorded on the run?
-        # Log params
-        self.params = {"model_uri": model_uri, "model_input": model_input}
+        # Log params      
         clean_params = self.__log_params__()
+        
+        # Unpack Task params
+        if isinstance(model_input, Task):
+            model_input = model_input.get_result()
 
         # Run the task
         model = mlflow.pyfunc.load_model(model_uri)
