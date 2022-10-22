@@ -1,10 +1,16 @@
 name: PyTest
 
 on:
+  push:
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   pytest:
+    defaults:
+      run:
+        shell: bash -l {0}
     runs-on: ubuntu-latest
 
     steps:
@@ -16,11 +22,15 @@ jobs:
       with:
         python-version: 3.9
 
-    - name: Install dependencies
-      run: sudo pip install -r requirements.txt
-
-    - name: Install PyTest
-      run: sudo pip install pytest
+    - name: Set up Conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        activate-environment: mlflow_tasks_dev
+        environment-file: tests/environment.yml
+        auto-activate-base: false
 
     - name: Run Pytest
-      run: sudo pytest
+      run: |
+        conda activate mlflow_tasks_dev
+        python -m ipykernel install --user --name mlflow_tasks_dev --display-name "mlflow_tasks_dev"
+        pytest -W ignore

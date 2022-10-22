@@ -14,25 +14,6 @@ sys.path.insert(0, project_folder)
 
 import mlflow
 
-
-test_tracking_folder = os.path.join(project_folder, "test_mlruns")
-# Clear the testing tracking folder
-import shutil
-try:
-    #shutil.rmtree(test_tracking_folder)
-    os.mkdir(test_tracking_folder)
-except:
-    pass
-# Make sure testing tracking folder exists
-try:
-    os.mkdir(test_tracking_folder)
-except:
-    pass
-test_tracking_folder = os.path.join(project_folder, "test_mlruns")
-
-# Set the mlflow tracking folder
-mlflow.set_tracking_uri(f"file:/{test_tracking_folder}")
-
 from mlflow.tracking import MlflowClient
 mlflow_client = MlflowClient()
 import mlflow_tasks
