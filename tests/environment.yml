@@ -3,10 +3,9 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - nb_conda_kernels
-  - nbconvert=6.4.0
-  - nbformat=5.1.3
-  - ipykernel
+  - nbconvert=7.0.0
+  - nbformat=5.7.0
+  - ipykernel=6.4.1
   - papermill=2.3.3
   - pip
   - pytest
