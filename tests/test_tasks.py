@@ -51,6 +51,13 @@ def test_task_get_result():
     task.end_run()
     res = task.get_result()
     assert res == 8
+
+def test_task_returns_none():
+    task = mlflow_tasks.Task(experiment_name="test_task_returns_none")
+    task.set_result(None)
+    task.end_run()
+    res = task.get_result()
+    assert res is None
     
 def test_task_get_params():
     task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="test_task_get_params")
