@@ -24,7 +24,8 @@ def test_data_handler_set():
     dh = data_handlers.Py_Obj_Handler()
     dataset = [1,2,3,5]
     run = mlflow.start_run()
-    dh.set(dataset, run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.register(run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.set(dataset)
     mlflow.end_run()
     assert dh.__data__ == dataset
 
@@ -32,7 +33,8 @@ def test_data_handler_get():
     dh = data_handlers.Py_Obj_Handler()
     dataset = [1,2,3,5]
     run = mlflow.start_run()
-    dh.set(dataset, run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.register(run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.set(dataset)
     mlflow.end_run()
     assert dh.get() == dataset
 
@@ -40,7 +42,8 @@ def test_data_handler_cache_local():
     dh = data_handlers.Py_Obj_Handler()
     dataset = [1,2,3,5]
     run = mlflow.start_run()
-    dh.set(dataset, run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.register(run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.set(dataset)
     mlflow.end_run()
     dh.cache_local()
     # Delete object
@@ -48,14 +51,15 @@ def test_data_handler_cache_local():
     # Create new handler
     dh2 = data_handlers.Py_Obj_Handler()
     # Re-load the data
-    dh2.load("/".join([run.info.experiment_id, run.info.run_id,"test/foo"]))
+    dh2.register(run.info.experiment_id, run.info.run_id, "test/foo")
     assert dh2.get() == dataset
 
 def test_data_handler_cache_global():
     dh = data_handlers.Py_Obj_Handler()
     dataset = [1,2,3,5]
     run = mlflow.start_run()
-    dh.set(dataset, run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.register(run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.set(dataset)
     mlflow.end_run()
     dh.cache_global()
     # Delete object
@@ -63,14 +67,15 @@ def test_data_handler_cache_global():
     # Create new handler
     dh2 = data_handlers.Py_Obj_Handler()
     # Re-load the data
-    dh2.load("/".join([run.info.experiment_id, run.info.run_id,"test/foo"]))
+    dh2.register(run.info.experiment_id, run.info.run_id, "test/foo")
     assert dh2.get() == dataset
 
 def test_data_handler_log():
     dh = data_handlers.Py_Obj_Handler()
     dataset = [1,2,3,5]
     run = mlflow.start_run()
-    dh.set(dataset, run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.register(run.info.experiment_id, run.info.run_id, "test/foo")
+    dh.set(dataset)
     mlflow.end_run()
     dh.log()
     # Delete object
@@ -78,5 +83,5 @@ def test_data_handler_log():
     # Create new handler
     dh2 = data_handlers.Py_Obj_Handler()
     # Re-load the data
-    dh2.load("/".join([run.info.experiment_id, run.info.run_id,"test/foo"]))
+    dh2.register(run.info.experiment_id, run.info.run_id, "test/foo")
     assert dh2.get() == dataset

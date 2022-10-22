@@ -115,9 +115,10 @@ class Task:
 
         ## Create the data handler
         if data_handler is None:
-            self.data_handler = active_data_handlers['default'](cache_dir, self.experiment_id, self.run_id, "result")
+            self.data_handler = active_data_handlers['default'](cache_dir)
         else:
-            self.data_handler = data_handler(cache_dir, self.experiment_id, self.run_id, "result")
+            self.data_handler = data_handler(cache_dir)
+        self.data_handler.register(self.experiment_id, self.run_id, "result")
 
         ## Save task params
         for p in special_task_params:
@@ -287,7 +288,8 @@ class Task:
             else:
                 sub_path = "/".join(["params", p])
                 p_handler = active_data_handlers['default'](cache_dir)
-                p_handler.set(val, self.experiment_id, self.run_id, sub_path)
+                p_handler.register(self.experiment_id, self.run_id, sub_path)
+                p_handler.set(val)
                 
                 if cache_local:
                     p_handler.cache_local()
@@ -309,7 +311,7 @@ class Task:
     def set_result(self, result):
         
         self.result = result
-        self.data_handler.set(result, self.experiment_id, self.run_id, "result")
+        self.data_handler.set(result)
             
         if self.write_local_cache:
             self.data_handler.cache_local()
