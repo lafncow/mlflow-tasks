@@ -1,21 +1,15 @@
 import mlflow
 import os
-import subprocess
 from mlflow.tracking import MlflowClient
 import mlflow.pyfunc
-import nbformat
 from nbconvert import HTMLExporter
 import papermill
-import shutil
 from typing import Callable
 from mlflow.entities import RunStatus
-from .data_handlers import Py_Obj_Handler
+from . import data_handlers
 from .data_handlers.utility import cache_dir, data_handler_from_path
 
-active_data_handlers = {
-    "default": Py_Obj_Handler,
-    "py_obj": Py_Obj_Handler
-}
+default_data_handler = data_handlers.Py_Obj_Handler
 
 special_task_params = ['write_log', 'write_local_cache', 'write_global_cache', 'autolog']
 
@@ -42,9 +36,6 @@ def get_task(run_id):
 
 def start_task(**args):
     return Task(**args)
-
-def register_data_handler(handler_name, handler):
-    active_data_handlers[handler_name] = handler
 
 class Task:
     def __init__(self, action=None, run_id=None, experiment_id=None, experiment_name=None, write_log=False, write_local_cache=False, write_global_cache=False, autolog=True, data_handler=None, **params):
@@ -111,9 +102,9 @@ class Task:
 
         ## Create the data handler
         if data_handler is None:
-            self.data_handler = active_data_handlers['default'](cache_dir)
+            self.data_handler = default_data_handler()
         else:
-            self.data_handler = data_handler(cache_dir)
+            self.data_handler = data_handler
         self.data_handler.register(self.experiment_id, self.run_id, "result")
 
         ## Save task params
@@ -282,7 +273,7 @@ class Task:
                 
             else:
                 sub_path = "/".join(["params", p])
-                p_handler = active_data_handlers['default'](cache_dir)
+                p_handler = default_data_handler()
                 p_handler.register(self.experiment_id, self.run_id, sub_path)
                 p_handler.set(val)
                 

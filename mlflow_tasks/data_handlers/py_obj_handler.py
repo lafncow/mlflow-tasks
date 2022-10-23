@@ -6,7 +6,7 @@ from .utility import *
 from mlflow.tracking import MlflowClient
 
 class Py_Obj_Handler:
-    def __init__(self, cache_dir=None):
+    def __init__(self):
         self.__data__ = None
         self.full_path = None
         self.path = None
@@ -15,9 +15,6 @@ class Py_Obj_Handler:
         self.global_cache_uri = None
         self.experiment_id = None
         self.run_id = None
-        
-        if cache_dir is None:
-            cache_dir = os.path.join(os.path.abspath(''), "mlflow_tasks_cache")
         self.cache_dir = cache_dir
         
         self.mlflow_client = MlflowClient()
@@ -41,9 +38,7 @@ class Py_Obj_Handler:
         # Create Metadata
         metadata = {
             "data_handler": "Py_Obj_Handler",
-            "handler_args": {
-                "cache_dir": self.cache_dir
-            },
+            "handler_args": {},
             "full_path": self.full_path,
             "experiment_id": self.experiment_id,
             "run_id": self.run_id,
