@@ -30,16 +30,18 @@ def test_active_task_none():
     assert task is None
 
 def test_start_task():
-    task = mlflow_tasks.start_task()
+    task = mlflow_tasks.start_task(experiment_name="test_start_task")
+    task.end_run()
     assert isinstance(task, mlflow_tasks.Task)
     
 def test_active_task_exists():
-    mlflow_tasks.start_task()
+    mlflow_tasks.start_task(experiment_name="test_active_task_exists")
     task = mlflow_tasks.active_task()
+    task.end_run()
     assert isinstance(task, mlflow_tasks.Task)
 
 def test_get_task():
-    mlflow_tasks.start_task()
+    mlflow_tasks.start_task(experiment_name="test_get_task")
     act_task = mlflow_tasks.active_task()
     task = mlflow_tasks.get_task(act_task.run_id)
     task.end_run()

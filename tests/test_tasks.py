@@ -51,6 +51,13 @@ def test_task_get_result():
     task.end_run()
     res = task.get_result()
     assert res == 8
+
+def test_task_returns_none():
+    task = mlflow_tasks.Task(experiment_name="test_task_returns_none")
+    task.set_result(None)
+    task.end_run()
+    res = task.get_result()
+    assert res is None
     
 def test_task_get_params():
     task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="test_task_get_params")
@@ -69,7 +76,51 @@ def test_task_exec_script():
     res = task.get_result()
     assert res == 16
 
+# Define the model class
+class AddN(mlflow.pyfunc.PythonModel):
+
+    def __init__(self, n):
+        self.n = n
+
+    def predict(self, context, model_input):
+        return model_input.apply(lambda column: column + self.n)
+
+def test_task_exec_model():
+    task1 = mlflow_tasks.Task(experiment_name="test_task_exec_model_1")
+    # Define model
+    my_model = AddN(n=5)
+    # Save model
+    mlflow.pyfunc.log_model("my_model", python_model=my_model)
+    model_uri = mlflow.get_artifact_uri("my_model")
+    task1.end_run()
+    # Create input
+    import pandas as pd
+    model_input = pd.DataFrame([range(10)])
+    # Create task
+    task2 = mlflow_tasks.Task(model_uri, model_input=model_input, experiment_name="test_task_exec_model_2")
+    res = task2.get_result()
+    task2.end_run()
+    assert res.equals(pd.DataFrame([range(10)]) + 5)
+
 def test_task_exec_nb():
     task = mlflow_tasks.Task("tests/notebook.ipynb", test_param=8, experiment_name="test_task_exec_nb")
     res = task.get_result()
     assert res == 16
+
+def test_task_input_to_model():
+    task1 = mlflow_tasks.Task(experiment_name="test_task_input_to_model_1")
+    # Define model
+    my_model = AddN(n=5)
+    # Save model
+    mlflow.pyfunc.log_model("my_model", python_model=my_model)
+    model_uri = mlflow.get_artifact_uri("my_model")
+    task1.end_run()
+    # Create input
+    import pandas as pd
+    def get_df():
+        return pd.DataFrame([range(10)])
+    task2 = mlflow_tasks.Task(get_df, experiment_name="test_task_input_to_model_2")
+    # Create task
+    task3 = mlflow_tasks.Task(model_uri, model_input=task2, experiment_name="test_task_input_to_model_3")
+    res = task3.get_result()
+    assert res.equals(pd.DataFrame([range(10)]) + 5)

@@ -54,6 +54,6 @@ def data_handler_from_path(full_path):
     # Create data handler
     data_handler = data_handlers.__dict__[data_handler_name](**metadata['handler_args'])
     # Load the data
-    data_handler.load(metadata['full_path'])
+    data_handler.register(metadata['experiment_id'], metadata['run_id'], metadata['path'])
     
     return data_handler
