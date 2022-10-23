@@ -11,7 +11,7 @@ with open('LICENSE') as f:
 
 setup(
     name='mlflow_tasks',
-    version='0.1.0',
+    version='0.9.0',
     description='MLFlow extension for task-driven code',
     long_description=readme,
     author='Adam Cornille',
