@@ -63,10 +63,6 @@ class Task:
         self.write_global_cache = write_global_cache
         self.params = params
         self.autolog = autolog
-        
-        if "FLOW_LOG_RESULT" in os.environ:
-            if (os.environ["FLOW_LOG_RESULT"] == "True") or (os.environ["FLOW_LOG_RESULT"] == "TRUE"):
-                self.write_log = True
 
         action_name = None
 
@@ -77,7 +73,7 @@ class Task:
             # It is a string
             elif isinstance(action, str):
                 action_name = os.path.basename(action)
-                if action[-3:] == ".py" or action[-6:] == ".ipynb":
+                if action[-6:] == ".ipynb":
                     self.write_local_cache = True
                 if (action_name is None) or (action_name == ""):
                     # May be needed for running model uris
@@ -210,7 +206,6 @@ class Task:
         os.environ["MLFLOW_TRACKING_URI"] = mlflow.tracking.get_tracking_uri()
         os.environ["MLFLOW_EXPERIMENT_NAME"] = self.experiment_name
         os.environ["MLFLOW_RUN_ID"] = str(self.run_id)
-        os.environ["FLOW_LOG_RESULT"] = str(True)
 
         nb_name = os.path.splitext(os.path.split(nb_path)[1])[0]
         nb_result_name = nb_name+"_result.ipynb"
