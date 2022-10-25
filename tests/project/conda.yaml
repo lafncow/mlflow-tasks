@@ -1,0 +1,11 @@
+name: mlflow_project_test
+channels:
+  - conda-forge
+  - default
+dependencies:
+  - python-graphviz
+  - nbformat
+  - nbconvert
+  - papermill
+  - pip:
+    - mlflow

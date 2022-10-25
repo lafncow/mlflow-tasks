@@ -70,6 +70,9 @@ class Task:
                     # May be needed for running model uris
                     print(f"DEBUG: needed to set action_name differently for model URI {action} -> {os.path.split(action)[-1]}")
                     action_name = os.path.split(action)[-1]
+            elif isinstance(action, tuple):
+                self.write_local_cache = True
+                action_name = action[0]
 
         if experiment_name is None:
             experiment_name = action_name
@@ -101,11 +104,16 @@ class Task:
                 self.__setattr__(p, param_val)
 
         ## Create the data handler
-        if data_handler is None:
-            self.data_handler = default_data_handler()
-        else:
+        if not data_handler is None:
             self.data_handler = data_handler
-        self.data_handler.register(self.experiment_id, self.run_id, "result")
+            self.data_handler.register(self.experiment_id, self.run_id, "result")
+        else:
+            # Try to get existing logged data handler
+            self.data_handler = data_handler_from_path(f"{self.experiment_id}/{self.run_id}/result")
+            if self.data_handler is None:
+                # Fall back to default
+                self.data_handler = default_data_handler()
+                self.data_handler.register(self.experiment_id, self.run_id, "result")
 
         ## Save task params
         for p in special_task_params:
@@ -136,6 +144,10 @@ class Task:
                 # is model uri
                 # TODO validate model uri
                     end_status = self.__exec_model__(action, params["model_input"])
+            elif isinstance(action, tuple):
+                if len(action) == 1:
+                    action = (action[0], "main") # Default to main entry point, as does MLFlow
+                end_status = self.__exec_project__(action[0], action[1])
             else:
                 #Fail
                 raise Exception("Invalid task action type (not a function or string).")
@@ -248,6 +260,27 @@ class Task:
 
         # End the run
         return "FINISHED"
+    
+    def __exec_project__(self, project_uri, entry_point):
+        # Log params      
+        clean_params = self.__log_params__(cache_local=True)
+        
+        # Set MLFlow environment variables
+        env_old = os.environ.copy()
+        os.environ["MLFLOW_TRACKING_URI"] = mlflow.tracking.get_tracking_uri()
+        os.environ["MLFLOW_EXPERIMENT_NAME"] = self.experiment_name
+        os.environ["MLFLOW_RUN_ID"] = str(self.run_id)
+        
+        # Set result so that result data handler works in model process
+        self.set_result(None)
+        
+        # Run the task
+        project_run = mlflow.projects.run(uri=project_uri, entry_point=entry_point, run_id=self.run_id)
+        
+        # Reset the MLFlow environment variables
+        os.environ = env_old
+        
+        return project_run.get_status()
 
     def __log_params__(self, cache_local=False, cache_global=False, write_log=False):
 
