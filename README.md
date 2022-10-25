@@ -9,7 +9,7 @@ MFlow Tasks provides two classes, **Task** and **Flow**:
 ## Task
 
 A class to run workflow tasks by:
- 1. executing functions, files, notebooks, or MLFLow models as tasks
+ 1. executing functions, files, notebooks, MLFlow projects, or MLFLow models as tasks
  2. passing data in and out of tasks, using caching and mlflow logging as needed
  3. logging the task execution as an MLFlow run
  4. logging helpful parameters, metrics, and artifacts (for example: logging notebook tasks as html)
@@ -54,7 +54,7 @@ pip install .
  ```
 
 ## Task Types
-Tasks can be Python functions, .py scripts, .ipynb notebooks, or MLFlow models
+Tasks can be Python functions, .py scripts, .ipynb notebooks, MLFlow projects, or MLFlow models
 
 ### Python Function
 ```python
@@ -69,6 +69,11 @@ py_task = Task("my_task.py", x=8)
 ### iPython Notebook
 ```python
 nb_task = Task("my_task.ipynb", x=8)
+```
+
+### MLFLow Project
+```python
+task = Task(("path/to/project", "entry_point"), x=8) # Tuple of path and entry_point
 ```
 
 ### MLFlow Model
