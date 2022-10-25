@@ -124,3 +124,8 @@ def test_task_input_to_model():
     task3 = mlflow_tasks.Task(model_uri, model_input=task2, experiment_name="test_task_input_to_model_3")
     res = task3.get_result()
     assert res.equals(pd.DataFrame([range(10)]) + 5)
+
+def test_task_exec_project():
+    task = mlflow_tasks.Task(("tests/project", "main"), test_param=8, experiment_name="test_task_exec_project")
+    res = task.get_result()
+    assert res == 16
