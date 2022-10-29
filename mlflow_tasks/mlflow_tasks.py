@@ -242,19 +242,30 @@ class Task:
         # End the run
         return "FINISHED"
 
-    def __exec_model__(self, model_uri, model_input):
-        # TODO change they way model_uri is recorded on the run?
+    def __exec_model__(self, model_uri, model_input, env_manager="conda"):
         # Log params      
         clean_params = self.__log_params__()
-        
+
         # Unpack Task params
         if isinstance(model_input, Task):
             model_input = model_input.get_result()
 
-        # Run the task
-        model = mlflow.pyfunc.load_model(model_uri)
+        # Check the running environment
+        from mlflow.pyfunc import _ServedPyFuncModel, _load_model_or_server
+        from mlflow.utils import env_manager as _EnvManager
+
+        _EnvManager.validate(env_manager)
+
+        # Load the model
+        model = _load_model_or_server(model_uri, env_manager)
+
+        # Predict
         result_data = model.predict(model_input)
-        
+
+        # Clean up the prediction server
+        if isinstance(model, _ServedPyFuncModel):
+            os.kill(model.pid, signal.SIGTERM)
+
         # Save result
         self.set_result(result_data)
 
