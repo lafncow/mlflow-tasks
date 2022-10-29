@@ -10,4 +10,4 @@ dependencies:
   - pip
   - pytest
   - pip:
-    - mlflow==1.29.0
+    - mlflow==1.30.0
