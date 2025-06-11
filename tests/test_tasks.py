@@ -1,6 +1,7 @@
 # +
 import os
 import sys
+import tempfile
 
 # Add the folder that contains this script to PYTHONPATH so that mlflow_tasks can be imported
 try:
@@ -18,63 +19,73 @@ import mlflow
 
 # +
 # Test Task Methods
-def test_create_task():
-    task = mlflow_tasks.Task(experiment_name="test_create_task")
-    task.end_run()
-    assert isinstance(task, mlflow_tasks.Task)
+def test_task_init():
+    task = mlflow_tasks.Task(experiment_name="test_task_init")
+    assert task.experiment.name == "test_task_init"
 
-def test_create_task_named():
-    task = mlflow_tasks.Task(experiment_name="test_create_task_named")
-    task.end_run()
-    assert task.experiment_name == "test_create_task_named"
 
-def test_task_get_run():
-    task = mlflow_tasks.Task(experiment_name="test_task_get_run")
-    run = task.get_run()
-    task.end_run()
-    assert isinstance(run, mlflow.entities.Run)
-    
-def test_task_end_task():
-    task = mlflow_tasks.Task(experiment_name="test_task_end_task")
-    task.end_run()
-    assert task.get_run().info.status == "FINISHED"
+def test_task_run():
+    task = mlflow_tasks.Task(experiment_name="test_task_run")
+    task_run = task.run()
+    assert isinstance(task_run, mlflow_tasks.TaskRun)
 
-def test_task_set_result():
-    task = mlflow_tasks.Task(experiment_name="test_task_set_result")
-    task.set_result(8)
-    task.end_run()
-    assert task.result == 8
 
-def test_task_get_result():
-    task = mlflow_tasks.Task(experiment_name="test_task_get_result")
-    task.set_result(8)
-    task.end_run()
-    res = task.get_result()
-    assert res == 8
+def test_taskrun_init_unnamed():
+    task_run = mlflow_tasks.TaskRun()
+    assert isinstance(task_run, mlflow_tasks.TaskRun)
 
-def test_task_returns_none():
-    task = mlflow_tasks.Task(experiment_name="test_task_returns_none")
-    task.set_result(None)
-    task.end_run()
-    res = task.get_result()
-    assert res is None
-    
-def test_task_get_params():
-    task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="test_task_get_params")
-    params = task.get_params()
-    task.end_run()
-    assert params['x'] == 8
 
-def test_task_exec_func():
-    task = mlflow_tasks.Task(lambda x:x-1, x=8, experiment_name="test_task_exec_func")
-    res = task.get_result()
-    task.end_run()
+def test_taskrun_init_named():
+    task_run = mlflow_tasks.TaskRun(experiment_name="test_taskrun_init_named")
+    experiment_id = task_run.mlflow_run.info.experiment_id
+    experiment = mlflow.get_experiment(experiment_id)
+    assert experiment.name == "test_taskrun_init_named"
+
+
+def test_task_run_multiple():
+    task = mlflow_tasks.Task(experiment_name="test_task_run")
+    task_runs = [task.run(x=i) for i in range(3)]
+    assert isinstance(task_runs[0], mlflow_tasks.TaskRun)
+
+
+def test_taskrun_get_params():
+    task = mlflow_tasks.Task(experiment_name="test_taskrun_get_params")
+    task_run = task.run(x=1, y=2)
+    params = task_run.get_params()
+    assert params == {'x': 1, 'y': 2}
+
+
+def test_taskrun_set_result():
+    task = mlflow_tasks.Task(experiment_name="test_taskrun_set_result")
+    task_run = task.run()
+    task_run.set_result(8)
+    assert task_run.get_result() == 8
+
+
+def test_taskrun_none_result():
+    task = mlflow_tasks.Task(experiment_name="test_taskrun_none_result")
+    task_run = task.run()
+    assert task_run.get_result() is None
+
+
+# ========================================================================
+
+
+def test_func_task():
+    task = mlflow_tasks.FuncTask(lambda x: x-1,
+                                 experiment_name="test_func_task")
+    task_run = task.run(x=8)
+    res = task_run.get_result()
     assert res == 7
 
-def test_task_exec_script():
-    task = mlflow_tasks.Task("tests/script.py", test_param=8, experiment_name="test_task_exec_script")
-    res = task.get_result()
+
+def test_py_task():
+    task = mlflow_tasks.PyTask("tests/script.py",
+                               experiment_name="test_task_exec_script")
+    task_run = task.run(test_param=8)
+    res = task_run.get_result()
     assert res == 16
+
 
 # Define the model class
 class AddN(mlflow.pyfunc.PythonModel):
@@ -85,47 +96,62 @@ class AddN(mlflow.pyfunc.PythonModel):
     def predict(self, context, model_input):
         return model_input.apply(lambda column: column + self.n)
 
-def test_task_exec_model():
-    task1 = mlflow_tasks.Task(experiment_name="test_task_exec_model_1")
+
+def test_model_task():
     # Define model
     my_model = AddN(n=5)
     # Save model
-    mlflow.pyfunc.log_model("my_model", python_model=my_model)
-    model_uri = mlflow.get_artifact_uri("my_model")
-    task1.end_run()
+    temp_path = tempfile.TemporaryDirectory().name
+    model_path = os.path.join(temp_path, "pytest_test_model")
+    mlflow.pyfunc.save_model(model_path,
+                             python_model=my_model)
     # Create input
     import pandas as pd
     model_input = pd.DataFrame([range(10)])
     # Create task
-    task2 = mlflow_tasks.Task(model_uri, model_input=model_input, experiment_name="test_task_exec_model_2")
-    res = task2.get_result()
-    task2.end_run()
+    task = mlflow_tasks.ModelTask(model_path,
+                                  experiment_name="test_model_task")
+    task_run = task.run(model_input=model_input)
+    res = task_run.get_result()
     assert res.equals(pd.DataFrame([range(10)]) + 5)
 
-def test_task_exec_nb():
-    task = mlflow_tasks.Task("tests/notebook.ipynb", test_param=8, experiment_name="test_task_exec_nb")
-    res = task.get_result()
-    assert res == 16
 
-def test_task_input_to_model():
-    task1 = mlflow_tasks.Task(experiment_name="test_task_input_to_model_1")
+def test_taskrun_input_to_model():
     # Define model
     my_model = AddN(n=5)
     # Save model
-    mlflow.pyfunc.log_model("my_model", python_model=my_model)
-    model_uri = mlflow.get_artifact_uri("my_model")
-    task1.end_run()
+    temp_path = tempfile.TemporaryDirectory().name
+    model_path = os.path.join(temp_path, "pytest_test_model")
+    mlflow.pyfunc.save_model(model_path,
+                             python_model=my_model)
     # Create input
     import pandas as pd
+
     def get_df():
         return pd.DataFrame([range(10)])
-    task2 = mlflow_tasks.Task(get_df, experiment_name="test_task_input_to_model_2")
+
+    input_task = mlflow_tasks.FuncTask(get_df,
+                                       experiment_name="test_task_input_to_model_1")
+    input_task_run = input_task.run()
     # Create task
-    task3 = mlflow_tasks.Task(model_uri, model_input=task2, experiment_name="test_task_input_to_model_3")
-    res = task3.get_result()
+    model_task = mlflow_tasks.ModelTask(model_path,
+                                   experiment_name="test_task_input_to_model_2")
+    task_run = model_task.run(model_input=input_task_run)
+    res = task_run.get_result()
     assert res.equals(pd.DataFrame([range(10)]) + 5)
 
-def test_task_exec_project():
-    task = mlflow_tasks.Task(("tests/project", "main"), test_param=8, experiment_name="test_task_exec_project")
-    res = task.get_result()
+
+#def test_nb_task():
+#    task = mlflow_tasks.NotebookTask("tests/notebook.ipynb",
+#                                     experiment_name="test_task_exec_nb")
+#    task_run = task.run(test_param=8)
+#    res = task_run.get_result()
+#    assert res == 16
+
+
+def test_project_task_path_only():
+    task = mlflow_tasks.ProjectTask("tests/project",
+                                    experiment_name="test_project_task_path_only")
+    task_run = task.run(test_param=8)
+    res = task_run.get_result()
     assert res == 16

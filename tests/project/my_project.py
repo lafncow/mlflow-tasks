@@ -10,10 +10,12 @@ except:
 
 sys.path.insert(0, project_folder)
 
-from mlflow_tasks import Task
+from mlflow_tasks import TaskRun
+from mlflow_tasks.data_handlers import PickleDataHandler
 
-task = Task() # Fetches the active task
-params = task.get_params()
-print(params)
+default_params = {"test_param": PickleDataHandler(21.5)}
+task_run = TaskRun(experiment_name="project test",
+                   handled_params=default_params) # Fetches the active task
+params = task_run.get_params()
 result = params["test_param"] * 2 # 16
-task.set_result(result)
+task_run.set_result(result)
